@@ -1,0 +1,25 @@
+# Minimal GitHub Actions template: build the offline installer on every merge.
+# Place in .github/workflows/ of the installer repo and adjust as needed.
+name: build-installer
+on:
+  push:
+    branches: [master, main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+      - name: Install constructor
+        run: conda install constructor -y
+      - name: Build installer
+        env:
+          VERSION: 3.1.3
+          CUDA_VERSION: ""
+        run: |
+          cd deepmd-kit
+          constructor .
+          ls -lh *.sh
+      # Upload step (to release/artifacts) to be configured as needed.
