@@ -16,6 +16,15 @@
 {% set tf_version    = os.environ.get("TF_VERSION")    or ">=2.19" %}
 {% set lammps_version= os.environ.get("LAMMPS_VERSION") or "" %}
 {% set flax_version  = os.environ.get("FLAX_VERSION")  or ">=0.10.0" %}
+{# Commit-keyed packaging: build_pkg_from_commit.sh builds a commit into a local
+   channel and sets these. When DEEPMD_BUILD is set, deepmd-kit is pinned to that
+   EXACT build string (the commit build) instead of the {variant}* selector. #}
+{% set local_channel = os.environ.get("DEEPMD_LOCAL_CHANNEL") or "" %}
+{% set build_string  = os.environ.get("DEEPMD_BUILD") or "" %}
+{# A commit build is compiled against ONE python ABI (encoded in its build string).
+   Co-pin python so the floating tensorflow/lammps specs can't drag in an
+   incompatible interpreter and leave the solve unsatisfiable. #}
+{% set py_version    = os.environ.get("DEEPMD_PY_VERSION") or "" %}
 {% if cuda_version == '' %}
 {% set variant = "cpu" %}
 {% set variant_version = "cpu" %}
@@ -28,11 +37,17 @@ name: deepmd-kit
 version: {{ version }}-{{ variant_version }}
 
 channels:
+{% if local_channel %}
+- {{ local_channel }}
+{% endif %}
 - https://conda.anaconda.org/conda-forge/label/deepmd-kit_rc
 - https://conda.anaconda.org/conda-forge
 
 specs:
-- deepmd-kit {{ version }} {{ variant }}*
+- deepmd-kit {{ version }} {% if build_string %}{{ build_string }}{% else %}{{ variant }}*{% endif %}
+{% if py_version %}
+- python {{ py_version }}.*
+{% endif %}
 - lammps{% if lammps_version %} {{ lammps_version }}{% endif %}
 
 - horovod * {{ variant }}*

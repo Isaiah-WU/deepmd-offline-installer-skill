@@ -48,6 +48,72 @@ constructor downloads packages at build time, so any floating spec can drift.
   3. Paste the reported exact versions back into construct.yaml specs.
   The explicit lock (`dist/<installer>.lock.txt`) records exactly what was bundled.
 
+## GPU / CUDA builds
+The CUDA variant is already wired into construct.yaml (extra specs gated on a
+non-empty CUDA_VERSION: `cuda-version`, `njzjz/noarch::libdevice-hack-for-tensorflow`,
+`openmpi`; deepmd-kit/horovod/jaxlib build strings flip `cpu*`→`cuda*`).
+- Build node may have NO GPU. `build.sh` exports `CONDA_OVERRIDE_CUDA=$CUDA_VERSION`
+  and `CONDA_OVERRIDE_GLIBC=2.28` and uses the libmamba solver (matches upstream
+  deepmd-kit-recipes/installer CI) so the CUDA graph resolves without a `__cuda`
+  virtual package. Without these the solve fails on a GPU-less node.
+- Use `--cuda 12.9` (upstream default for current packages). A `cuda129` build
+  runs on any sufficiently new 12.x driver (NVIDIA minor-version compatibility),
+  not only driver 12.9.
+- `libdevice-hack-for-tensorflow` fixes TF/XLA "libdevice not found"; without it
+  the GPU is detected but XLA-compiled ops fail at runtime. The GPU verify runs a
+  `tf.function(jit_compile=True)` op specifically to exercise this.
+- The GPU `.sh` is multi-GB and exceeds GitHub's 2GiB per-asset limit. Use
+  `build.sh --split 3` to produce `.0/.1/.2`; reassemble with
+  `cat NAME.0 NAME.1 NAME.2 > NAME`. For local Bohrium verify, skip splitting.
+- GPU verify MUST run on a node WITH a GPU + driver. `unshare -rn` cuts network
+  but keeps `/dev/nvidia*`, so the GPU stays visible inside the namespace.
+  `verify_offline.sh` auto-detects GPU mode from a `*cuda*` filename (override
+  with `VERIFY_GPU=1/0`) and adds `nvidia-smi` + TF GPU/XLA + torch.cuda checks.
+
+## Commit-keyed packaging (two-stage; for frequent dev builds)
+Goal: package a specific deepmd-kit GIT COMMIT, not a released version.
+KEY FACT: no per-commit deepmd-kit conda package exists on any channel, and
+`constructor` can only bundle EXISTING conda packages. So a commit must be built
+from source FIRST, into a local channel, which constructor then consumes.
+
+> ⚠️ Stage 1 is a real feedstock-engineering step and MUST be validated/iterated
+> on Linux against the LIVE conda-forge/deepmd-kit-feedstock. The script fails
+> loudly when an assumption breaks rather than emitting junk. Building a compiled
+> CUDA package per commit needs Docker and tens of minutes to >1h.
+
+- **Stage 1 — `scripts/build_pkg_from_commit.sh --commit <sha> [--cuda 12.9] [--config <stem>]`**
+  Drives the MAINTAINED `conda-forge/deepmd-kit-feedstock` (the stale git-source
+  fork `deepmd-kit-recipes/deepmd-kit-feedstock` is frozen at v2.2.11 and cannot
+  build a modern commit). It:
+  1. clones the feedstock and **rewrites the recipe `source:`** from the release
+     tarball (`url:` + `sha256:`) to a git source (`git_url` + `git_rev: <sha>`),
+     leaving the second (lammps) source and the `folder:` layout intact;
+  2. sets the conda **version label** (`--pkg-version`, else derived via
+     `git describe`, e.g. `3.2.0b1.dev17`) — required because the recipe ties
+     name/build-string to `{% set version %}`, so changing only `git_rev` would
+     mislabel the package;
+  3. builds with a **`.ci_support/<config>.yaml` variant** (NOT a hand-crafted
+     `--variants`): `CI=1 python build-locally.py <config>` (Docker). The configs
+     are named e.g. `linux_64_cuda_compiler_version12.9mpimpichpython3.11...`
+     (CUDA 12.9 / None × py3.10/3.11/3.12). CPU config is auto-picked; for CUDA
+     pass `--config` (run once with no `--config` to list them). NOTE: the COMPILER
+     cuda in the config name is distinct from the RUNTIME `--cuda` pinned in Stage 2.
+  4. writes `local-channel/COMMIT_BUILD.env` (quoted) with the EXACT
+     version + build string + **python** + cuda + commit.
+- **Stage 2 — `scripts/build.sh --from-commit-channel ./local-channel`**
+  Safely parses COMMIT_BUILD.env (no `source`), prepends the local channel
+  (`DEEPMD_LOCAL_CHANNEL`), pins deepmd-kit to the exact build string
+  (`DEEPMD_BUILD`) AND co-pins `python` (`DEEPMD_PY_VERSION`) so floating
+  tensorflow/lammps can't drag in an incompatible interpreter. Then constructor +
+  verify run as for releases.
+- Why not pip-from-git: pip builds only the Python `dp` command, not the `lmp`
+  LAMMPS binary / C++ interface (separate CMake build) — it would break the
+  existing `lmp -h` offline acceptance test.
+- For "very frequent" packaging, automate Stage 1 in CI (matrix cpu + each CUDA),
+  cache conda/compiler artifacts. **Cleanest long-term: have upstream (njzjz)
+  publish per-commit conda packages to a dedicated label, collapsing Stage 1 to
+  "point constructor at that channel"** — worth raising with jinzhe.
+
 ## Automating the build on every PR (CI)
 The local build can be automated so a new installer is built whenever a PR is
 merged (similar to PyTorch nightly builds). This is done with a CI workflow

@@ -15,16 +15,40 @@ bar: **every run succeeds, on any model** (`pass_rate = 100%`, variance = 0).
 | `SKILL.md` is orchestration-only; raw `constructor` moved to `references/notes.md`; removed `#ler` junk | One path, not two → less model variance. |
 | New `evals/` harness | Turns "run it many times, all pass" into a measurable pass_rate + variance. |
 
+### Round 2 (mentor: GPU variant + commit-keyed packaging)
+| Fix | Why |
+| --- | --- |
+| `build.sh` exports `CONDA_OVERRIDE_CUDA`/`CONDA_OVERRIDE_GLIBC=2.28` + libmamba when `--cuda` set | A GPU-less build node otherwise can't resolve the CUDA variant (missing `__cuda`). Matches upstream installer CI. |
+| `build.sh --split N` | GPU `.sh` is multi-GB > GitHub's 2GiB asset limit; split + `cat` reassembly. |
+| `verify_offline.sh` GPU mode (auto from `*cuda*` filename) | Adds `nvidia-smi`, TF GPU visibility, and a `jit_compile=True` XLA op that proves the libdevice-hack works. Must run on a GPU node. |
+| New `scripts/build_pkg_from_commit.sh` (Stage 1) + `construct.yaml` `DEEPMD_LOCAL_CHANNEL`/`DEEPMD_BUILD` + `build.sh --from-commit-channel` (Stage 2) | Commit packaging: no per-commit conda package exists, so build the commit from source into a local channel first, then constructor bundles that exact build. |
+
 ## The acceptance flow (run in this order)
 
 ### 1. On a Linux build machine WITH internet
 ```bash
 cd deepmd-offline-installer-skill
-bash scripts/build.sh --version 3.1.3            # CPU; add --cuda 12.1 for GPU
+bash scripts/build.sh --version 3.1.3            # CPU
 bash scripts/verify_offline.sh dist/*.sh 3.1.3   # proves offline install works
 bash scripts/freeze.sh dist/*.sh                 # capture exact pins -> dist/*.lock.txt
 ```
 Then paste the key versions from the freeze output into `assets/construct.yaml`.
+
+### 1b. GPU variant (build anywhere; VERIFY on a GPU node)
+```bash
+bash scripts/build.sh --version 3.1.3 --cuda 12.9          # add --split 3 to ship via GitHub
+# on a Bohrium GPU node with an NVIDIA driver:
+bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1.3
+```
+
+### 1c. Commit-keyed build (Mode B — two stages, Linux + Docker)
+```bash
+# list configs once, then pick one matching your cuda+python:
+bash scripts/build_pkg_from_commit.sh --commit <sha> --cuda 12.9 \
+     --config linux_64_cuda_compiler_version12.9mpimpichpython3.11.____cpython
+bash scripts/build.sh --from-commit-channel ./local-channel
+bash scripts/verify_offline.sh dist/*.sh
+```
 
 ### 2. Deterministic stability (Layer 1)
 ```bash
@@ -50,5 +74,21 @@ Want: `agent pass_rate = 100%` on ≥2 models.
   but not run**. The actual constructor build + offline verify must run on a
   Linux box (constructor installers are `Linux-x86_64`).
 - CUDA offline-verify needs a GPU host with an NVIDIA driver; on a CPU-only box
-  the verify step records SKIP (not PASS).
+  the GPU smoke tests fail by design — run them on a Bohrium GPU node.
 - GLIBC ≥ 2.17 is required on any target machine.
+- **Commit mode (Stage 1) needs validation on Linux against the live feedstock.**
+  `build_pkg_from_commit.sh` drives `conda-forge/deepmd-kit-feedstock`: it rewrites
+  the recipe `source:` to a git source at the commit, sets the version label, and
+  builds a `.ci_support` variant via `CI=1 python build-locally.py <config>`
+  (Docker). Verified against the live feedstock: source is a YAML list with a
+  lammps second source (preserved), configs are `cuda_compiler_version{12.9,None}`
+  × `python{3.10,3.11,3.12}`, and build-locally.py takes a positional config. The
+  residual risk is that a git-source build of an arbitrary modern commit may need
+  recipe dep pins to match — confirm on first run; the script fails loudly if the
+  source rewrite doesn't produce a `git_rev`. CUDA builds need Docker, tens of
+  minutes to >1h.
+- The COMPILER cuda in the `.ci_support` config name is distinct from the RUNTIME
+  `--cuda` pinned into the installer; keep them consistent (both 12.9 here).
+- Pin a specific `--feedstock-ref` for reproducible commit builds rather than `main`.
+- Strongly consider asking jinzhe/njzjz to publish per-commit conda packages
+  upstream — that collapses all of Stage 1 to "point constructor at a channel".
