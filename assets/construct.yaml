@@ -1,5 +1,21 @@
-{% set version = os.environ.get("VERSION") %}
-{% set cuda_version = os.environ.get("CUDA_VERSION") %}
+{#
+  Reproducibility note (the source of "sometimes works, sometimes fails"):
+  constructor downloads these packages at BUILD time. Any spec left floating can
+  resolve to a different version on a later build, or break when an upstream
+  package is updated/removed. For a stable, mentor-grade build:
+    1. Keep channels pinned (below).
+    2. Pin the major movers via env vars (VERSION/TF_VERSION/LAMMPS_VERSION/...).
+    3. After a green build, run scripts/freeze.sh to capture EXACT versions, then
+       paste those exact pins here for byte-stable rebuilds.
+  WARNING: the `deepmd-kit_rc` label holds release CANDIDATES that get rotated /
+  removed. For a stable release build, point at the stable conda-forge label
+  instead (override DEEPMD_CHANNEL or edit the channels list).
+#}
+{% set version       = os.environ.get("VERSION") %}
+{% set cuda_version  = os.environ.get("CUDA_VERSION") %}
+{% set tf_version    = os.environ.get("TF_VERSION")    or ">=2.19" %}
+{% set lammps_version= os.environ.get("LAMMPS_VERSION") or "" %}
+{% set flax_version  = os.environ.get("FLAX_VERSION")  or ">=0.10.0" %}
 {% if cuda_version == '' %}
 {% set variant = "cpu" %}
 {% set variant_version = "cpu" %}
@@ -17,7 +33,8 @@ channels:
 
 specs:
 - deepmd-kit {{ version }} {{ variant }}*
-- lammps
+- lammps{% if lammps_version %} {{ lammps_version }}{% endif %}
+
 - horovod * {{ variant }}*
 - mpi4py
 - dpdata
@@ -29,11 +46,11 @@ specs:
 - openmpi
 {% endif %}
 - libblas * *mkl
-- tensorflow >=2.19
+- tensorflow {{ tf_version }}
 # jax
 - jax
 - jaxlib * {{ variant }}*
-- flax >=0.10.0
+- flax {{ flax_version }}
 - orbax-checkpoint
 
 ignore_duplicate_files: True

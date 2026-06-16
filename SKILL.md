@@ -11,94 +11,66 @@ compatibility: Requires conda. Internet access needed at build time. Builds CPU 
 license: LGPL-3.0-or-later
 metadata:
   author: Isaiah-WU
-  version: '1.0'
+  version: '1.1'
 ---
 
 # DeePMD-kit Offline Installer (local build)
 
 Build a self-contained `.sh` offline installer for DeePMD-kit using conda
-`constructor`, locally instead of on CI.
+`constructor`. The recipe is **bundled in `assets/`**, so the build is
+self-contained — no external repo checkout is required.
 
 ## Quick Start
 
-One-click build with the bundled script:
+Do NOT write build commands by hand. Call the bundled scripts with parameters:
 
 ```bash
-bash scripts/build.sh <recipe_dir> <version> [cuda_version]
-bash scripts/build.sh /path/to/deepmd-kit-installer/deepmd-kit 3.1.3
+# 1) Build (CPU). Recipe defaults to the bundled assets/; output goes to ./dist
+bash scripts/build.sh --version 3.1.3
+
+# 1b) CUDA build
+bash scripts/build.sh --version 3.1.3 --cuda 12.1
+
+# 2) Acceptance test: prove it installs and runs OFFLINE
+bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cpu-Linux-x86_64.sh 3.1.3
 ```
 
-Or run manually:
+A build is only "done" when **step 2 passes**, not when step 1 produces a `.sh`.
 
-```bash
-conda install constructor -y
-cd <recipe_dir>
-export VERSION=3.1.3
-export CUDA_VERSION=
-constructor .
-```
+## Agent responsibilities (orchestration only)
 
-## Agent responsibilities
-
-1. Confirm conda is available (`conda --version`).
-2. Confirm `constructor` is installed; if not, install it.
-3. Confirm the recipe directory (with `construct.yaml`) is available.
-4. Collect build parameters: target version, and CPU or CUDA variant.
-5. Run constructor and confirm the `.sh` installer is produced.
-6. Report the output file name and size.
-
-## Workflow
-
-### Step 1: Install constructor
-
-```bash
-conda install constructor -y
-constructor --version
-```
-
-### Step 2: Get the recipe
-
-The recipe lives in the deepmd-kit-installer repo, folder `deepmd-kit/`,
-containing `construct.yaml`, `pre_install.sh`, `post_install.sh`.
-
-```bash
-cd /path/to/deepmd-kit-installer/deepmd-kit
-ls
-```
-
-### Step 3: Set build parameters
-
-```bash
-export VERSION=3.1.3
-export CUDA_VERSION=
-```
-
-### Step 4: Build the installer
-
-```bash
-constructor .
-```
-
-### Step 5: Verify output
-
-```bash
-ls -lh *.sh
-```
+1. Confirm conda is available (`conda --version`). `build.sh` installs
+   `constructor` itself if missing.
+2. Collect parameters from the user: `version` and CPU-vs-CUDA (`--cuda <ver>`).
+3. Run `scripts/build.sh` with those parameters. Do not run raw `constructor`
+   commands — the script freezes the error-prone steps.
+4. Run `scripts/verify_offline.sh` on the produced installer.
+5. Report the manifest (absolute path + size + sha256) and the verify result.
 
 ## Key parameters
 
-| Variable | Meaning | Example |
-| --- | --- | --- |
-| VERSION | deepmd-kit version | 3.1.3 |
-| CUDA_VERSION | empty for CPU; string for CUDA | "" or 12.1 |
+| Flag / env      | Meaning                                   | Default     |
+| --------------- | ----------------------------------------- | ----------- |
+| `--version`     | deepmd-kit version                        | 3.1.3       |
+| `--cuda`        | CUDA version; omit/empty = CPU build      | "" (CPU)    |
+| `--recipe-dir`  | recipe dir with construct.yaml            | bundled `assets/` |
+| `--output-dir`  | where the installer is written            | `./dist`    |
+| `TF_VERSION` env    | pin TensorFlow                        | `>=2.19`    |
+| `LAMMPS_VERSION` env| pin LAMMPS                            | unpinned    |
 
 ## Agent checklist
 
 - [ ] conda available
-- [ ] constructor installed
-- [ ] recipe directory with construct.yaml present
-- [ ] VERSION and CUDA_VERSION set
-- [ ] constructor completes without errors
-- [ ] `.sh` installer produced and size reported
+- [ ] `scripts/build.sh` run with explicit version (+ `--cuda` if GPU)
+- [ ] `.sh` installer produced; manifest reports absolute path + sha256
+- [ ] `scripts/verify_offline.sh` PASSED (installs + `dp -h`/`lmp -h` work offline)
+- [ ] reported version matches the requested version
 
-#ler
+## Notes & troubleshooting
+
+- Targets, requirements, the manual `constructor` workflow (for debugging only),
+  reproducibility/pinning, and the freeze→pin loop are documented in
+  [references/notes.md](references/notes.md).
+- For stable releases, do not build off the `deepmd-kit_rc` channel label — see
+  the warning at the top of `assets/construct.yaml`.
+- CI template to build on every merge: `assets/build-on-merge.yml`.
