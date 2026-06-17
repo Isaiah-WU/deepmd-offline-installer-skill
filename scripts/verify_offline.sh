@@ -37,6 +37,7 @@ else GPU_MODE=0; fi
 WORK="$(mktemp -d)"
 PREFIX="$WORK/dpenv"
 EXAMPLE_DIR="$WORK/example"
+E2E_DIR="$EXAMPLE_DIR"
 trap 'rm -rf "$WORK"' EXIT
 
 # If there's a bundled real example, copy it into the workspace so the isolated
