@@ -21,6 +21,8 @@
 #   --torch-version <ver>        pin PyTorch version in the installer (default: none = no torch)
 #   --backend <name>             ML backends to bundle: all (default), tensorflow, pytorch, jax
 #   --glibc <ver>                target system GLIBC version; also sets CONDA_OVERRIDE_GLIBC
+#   --example <name>            download this deepmd-kit example alongside the installer (dpa4, se_e2_a)
+#                               so verify_offline.sh can run real training+inference offline
 #   --from-commit-channel <dir>  local channel from build_pkg_from_commit.sh;
 #                                reads <dir>/COMMIT_BUILD.env to pin version+build+cuda+python
 #   -r, --recipe-dir <dir>       dir containing construct.yaml (default: bundled assets/)
@@ -55,6 +57,7 @@ DEEPMD_COMMIT=""
 DP_BACKEND="${DP_BACKEND:-all}"
 TORCH_VERSION="${TORCH_VERSION:-}"
 TARGET_GLIBC="${TARGET_GLIBC:-}"
+EXAMPLE="${EXAMPLE:-}"   # which example to bundle for offline verify (dpa4, se_e2_a, or none)
 
 usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "${BASH_SOURCE[0]}"; }
 fail() { echo "BUILD FAILED: $*" >&2; exit 1; }
@@ -68,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --torch-version)          TORCH_VERSION="$2"; shift 2 ;;
     --backend)                DP_BACKEND="$2"; shift 2 ;;
     --glibc)                  TARGET_GLIBC="$2"; shift 2 ;;
+    --example)                EXAMPLE="$2"; shift 2 ;;
     --from-commit-channel)    COMMIT_CHANNEL="$2"; shift 2 ;;
     -r|--recipe-dir)          RECIPE_DIR="$2"; shift 2 ;;
     -o|--output-dir)          OUTPUT_DIR="$2"; shift 2 ;;
@@ -175,6 +179,29 @@ if [[ -n "$CUDA_VERSION" ]]; then
 fi
 
 # --- verify artifact & emit manifest -----------------------------------------
+# --- download verification example (while we still have internet) ----------------
+if [[ -n "$EXAMPLE" ]]; then
+  EXAMPLE_DIR="$OUTPUT_DIR/examples/water"
+  echo "==> Downloading deepmd-kit example: $EXAMPLE (for offline verify)"
+  rm -rf "$EXAMPLE_DIR" 2>/dev/null || true
+  mkdir -p "$EXAMPLE_DIR"
+  if command -v git >/dev/null 2>&1; then
+    git clone --filter=blob:none --no-checkout --branch master https://github.com/deepmodeling/deepmd-kit.git "$EXAMPLE_DIR/repo" 2>/dev/null || true
+    if [[ -d "$EXAMPLE_DIR/repo" ]]; then
+      ( cd "$EXAMPLE_DIR/repo" && git sparse-checkout init --cone && git sparse-checkout set examples/water/ && git checkout master ) || true
+      if [[ -d "$EXAMPLE_DIR/repo/examples/water" ]]; then
+        cp -r "$EXAMPLE_DIR/repo/examples/water/"* "$EXAMPLE_DIR/"
+      fi
+      rm -rf "$EXAMPLE_DIR/repo"
+    fi
+  fi
+  if [[ -f "$EXAMPLE_DIR/se_e2_a/input.json" ]]; then
+    echo "    example downloaded OK (~$(du -sh "$EXAMPLE_DIR" | cut -f1))"
+  else
+    echo "    WARNING: could not download example; verify will fall back to synthetic data" >&2
+  fi
+fi
+
 echo "==> Collecting produced installer(s)"
 shopt -s nullglob
 INSTALLERS=("$OUTPUT_DIR"/*.sh)
