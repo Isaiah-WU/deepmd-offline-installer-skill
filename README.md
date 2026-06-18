@@ -17,67 +17,84 @@
 ### 整体架构
 
 ```
-                        ┌─────────────────────────────┐
-                        │  assets/construct.yaml      │
-                        │  (conda 包清单，Jinja2 模板)  │
-                        │  定义：装什么包、什么版本      │
-                        └──────────────┬──────────────┘
-                                       │
-┌──────────────┐              ┌────────▼────────┐
-│  用户/Agent  │ ──传参──▶    │ scripts/build.sh │  ← ★ 核心
-│  指定版本、   │              │ 编排整个构建流程   │
-│  后端、硬件   │              └────────┬────────┘
-└──────────────┘                       │
-                          ┌────────────▼────────────┐
-                          │  conda constructor      │
-                          │  下载包 → 校验 → 打包    │
-                          └────────────┬────────────┘
-                                       │
-                          ┌────────────▼────────────┐
-                          │  dist/xxx.sh (1.4+ GB)  │
-                          │  + manifest (sha256)     │
-                          └────────────┬────────────┘
-                                       │ 搬运到断网机器
-                          ┌────────────▼────────────┐
-                          │  scripts/verify_offline │  ← ★ 验收
-                          │  .sh                    │
-                          │  断网安装 → dp train    │
-                          │  → dp freeze → lammps   │
-                          └─────────────────────────┘
+                          ┌──────────────────────┐
+                          │  build.sh  接收参数   │
+                          │  ─────────────────── │
+                          │  • 版本号 (--version) │
+                          │  • CPU/GPU (--cuda)   │
+                          │  • 后端 (--backend)   │
+                          │  • 硬件 (--glibc)     │
+                          └──────────┬───────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    ▼                ▼                ▼
+          ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
+          │ construct.  │  │  constructor  │  │   example    │
+          │   yaml      │  │  下载+打包    │  │   数据下载    │
+          │ (购物清单)   │  │              │  │  (可选)      │
+          └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
+                 │                │                  │
+                 └────────┬───────┘                  │
+                          ▼                          │
+                ┌──────────────────┐                 │
+                │  dist/           │◄────────────────┘
+                │  ├── xxx.sh      │  1.4~3 GB
+                │  └── manifest    │  sha256 校验
+                └────────┬─────────┘
+                         │
+            ═════════════╪═══════════════  搬运到断网机器
+                         │
+                         ▼
+                ┌──────────────────┐
+                │  verify_offline  │
+                │  .sh             │
+                │  ─────────────── │
+                │  ① 切网          │
+                │  ② 安装到临时目录 │
+                │  ③ 冒烟测试      │
+                │  ④ dp train      │
+                │  ⑤ dp freeze     │
+                │  ⑥ lammps 推理   │
+                │                  │
+                │  exit 0 = ✅     │
+                └──────────────────┘
 ```
 
 ### 仓库结构
 
 ```
 deepmd-offline-installer-skill/
-├── README.md                     ← 本文件
-├── SKILL.md                      ← Claude Code Skill 定义（Agent 阅读）
-├── LICENSE                       ← LGPL-3.0
-├── HANDOFF.md                    ← 交接/验收清单
 │
-├── scripts/                      ← 可执行脚本（固化的，Agent 不写命令只调脚本）
-│   ├── build.sh                  ★ 构建离线安装包（唯一入口）
-│   ├── verify_offline.sh         ★ 断网验收（安装→训练→推理）
-│   ├── build_pkg_from_commit.sh   从 Git commit 编译 deepmd-kit（高级）
-│   └── freeze.sh                  锁定包版本（可复现构建）
+├─ 📄 README.md          中英文使用文档
+├─ 📄 SKILL.md            Agent 操作手册（Agent 阅读，只做编排）
+├─ 📄 LICENSE             LGPL-3.0
+├─ 📄 HANDOFF.md          交接 & 验收清单
 │
-├── assets/                       ← conda constructor 配方
-│   ├── construct.yaml            ★ Jinja2 模板：定义安装包内容
-│   ├── pre_install.sh            安装前提示
-│   └── post_install.sh           安装后提示
+├─ 📁 scripts/            固化脚本（Agent 不可即兴写命令）
+│  ├─ ⭐ build.sh         构建入口 — 打包离线安装器
+│  ├─ ⭐ verify_offline   验收入口 — 断网全流程验证
+│  ├─    build_pkg_       Git commit → conda 包（高级）
+│  │     from_commit.sh
+│  └─    freeze.sh        锁定版本 → 可复现构建
 │
-├── examples/                     ← 验证用数据
-│   └── verify-input.json         最小化训练配置（v2 格式）
+├─ 📁 assets/             constructor 配方
+│  ├─ ⭐ construct.yaml   Jinja2 模板 → 定义装什么
+│  ├─    pre_install.sh   安装前提示
+│  └─    post_install.sh  安装后提示
 │
-├── evals/                        ← 质量评测
-│   ├── README.md
-│   ├── prompts.md                测试 prompt
-│   ├── assertions.md             客观断言
-│   ├── run_build_verify.sh       脚本层稳定性
-│   └── run_agent_benchmark.sh    Agent 层稳定性
+├─ 📁 examples/           验证数据
+│  └─    verify-input     最小训练配置（v2 格式）
+│        .json
 │
-└── references/
-    └── notes.md                  详细技术文档
+├─ 📁 evals/              质量评测
+│  ├─    README / prompts / assertions
+│  ├─    run_build_       脚本稳定性（反复构建 N 次）
+│  │     verify.sh
+│  └─    run_agent_        Agent 稳定性（跨模型 N 次）
+│        benchmark.sh
+│
+└─ 📁 references/
+   └─    notes.md          排查手册 & GPU / commit 流程
 ```
 
 ### 前置要求
@@ -178,17 +195,55 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 
 > 注：v3.2.0b0 已有 conda 包，用 Mode A 即可跑 dpa4。Mode B 仅在需要真正未发布的 commit 时使用。
 
-### 验证流程（verify_offline.sh 做了什么）
+### 验证流程
 
 ```
-1. 切网（unshare -rn 或 docker --network none）
-2. 安装 .sh 到临时目录
-3. 冒烟测试：dp -h / lmp -h / import deepmd / 版本校验
-4. GPU（自动识别）：nvidia-smi / TF-GPU / JAX-GPU / XLA libdevice 证明
-5. 端到端：
-   ├── 有 bundled example → 用真实 192 原子水分子训练 + lammps 推理
-   └── 无 bundled example → 生成合成数据，训练 10 步 + lammps 推理
-6. 全部通过 → exit 0
+    输入: .sh 安装包 + 期望版本号
+    ═══════════════════════════════════
+
+    ┌──────────────────────────────────────────┐
+    │              ① 网络隔离                   │
+    │     unshare -rn  /  docker --network none │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │              ② 离线安装                   │
+    │     bash xxx.sh -b -p /tmp/dpenv         │
+    │     source /tmp/dpenv/bin/activate        │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │              ③ 冒烟测试                   │
+    │  ✅ dp -h      ✅ lmp -h                  │
+    │  ✅ import deepmd    ✅ 版本号校验          │
+    │  [GPU] ✅ nvidia-smi ✅ TF/JAX GPU visible│
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │           ④ dp train 训练                 │
+    │  ┌─ 有 bundled example ─────────────────┐ │
+    │  │  192 原子水分子 × 200 帧真实 DFT 数据   │ │
+    │  └──────────────────────────────────────┘ │
+    │  ┌─ 无 example ─────────────────────────┐ │
+    │  │  6 原子 × 10 帧合成数据               │ │
+    │  └──────────────────────────────────────┘ │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │           ⑤ dp freeze                    │
+    │     冻结 → 可部署的 .pb 模型文件           │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │         ⑥ lammps 推理                    │
+    │     lmp -in in.lammps                    │
+    │     加载冻结模型 → MD 模拟 3 步            │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │          VERIFY PASSED  ✅               │
+    │     exit 0 = 全部通关                     │
+    └──────────────────────────────────────────┘
 ```
 
 ### 安装后的能力
@@ -229,69 +284,85 @@ HPC clusters are typically disconnected from the internet. Standard `conda insta
 ### Architecture
 
 ```
-                        ┌─────────────────────────────┐
-                        │  assets/construct.yaml      │
-                        │  (Jinja2 template — what     │
-                        │   goes into the installer)   │
-                        └──────────────┬──────────────┘
-                                       │
-┌──────────────┐              ┌────────▼────────┐
-│  User/Agent  │ ──params──▶  │ scripts/build.sh │  ← ★ Core
-│  version,    │              │ orchestrates build │
-│  backend,    │              └────────┬────────┘
-│  hardware    │                       │
-└──────────────┘          ┌────────────▼────────────┐
-                          │  conda constructor      │
-                          │  download → verify →    │
-                          │  package into .sh       │
-                          └────────────┬────────────┘
-                                       │
-                          ┌────────────▼────────────┐
-                          │  dist/xxx.sh (1.4+ GB)  │
-                          │  + manifest (sha256)     │
-                          └────────────┬────────────┘
-                                       │ ship to air-gapped node
-                          ┌────────────▼────────────┐
-                          │  scripts/verify_offline │  ← ★ Acceptance
-                          │  .sh                    │
-                          │  offline install →      │
-                          │  dp train → freeze →    │
-                          │  lammps inference       │
-                          └─────────────────────────┘
+                          ┌──────────────────────┐
+                          │     build.sh          │
+                          │  ───────────────────  │
+                          │  • version (--version)│
+                          │  • CPU/GPU (--cuda)   │
+                          │  • backend (--backend)│
+                          │  • target (--glibc)   │
+                          └──────────┬───────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    ▼                ▼                ▼
+          ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
+          │ construct.  │  │  constructor  │  │   example    │
+          │   yaml      │  │  fetch+pack   │  │   data fetch │
+          │ (bill of    │  │              │  │  (optional)  │
+          │  materials) │  │              │  │              │
+          └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
+                 │                │                  │
+                 └────────┬───────┘                  │
+                          ▼                          │
+                ┌──────────────────┐                 │
+                │  dist/           │◄────────────────┘
+                │  ├── xxx.sh      │  1.4–3 GB
+                │  └── manifest    │  w/ sha256
+                └────────┬─────────┘
+                         │
+            ═════════════╪═══════════════  ship to air-gapped machine
+                         │
+                         ▼
+                ┌──────────────────┐
+                │  verify_offline  │
+                │  .sh             │
+                │  ─────────────── │
+                │  ① isolate net   │
+                │  ② install       │
+                │  ③ smoke tests   │
+                │  ④ dp train      │
+                │  ⑤ dp freeze     │
+                │  ⑥ lammps MD     │
+                │                  │
+                │  exit 0 = pass   │
+                └──────────────────┘
 ```
 
 ### Repository Layout
 
 ```
 deepmd-offline-installer-skill/
-├── README.md                     ← This file
-├── SKILL.md                      ← Claude Code Skill definition
-├── LICENSE                       ← LGPL-3.0
-├── HANDOFF.md                    ← Handoff and sign-off checklist
 │
-├── scripts/                      ← Frozen scripts (agent never writes commands)
-│   ├── build.sh                  ★ Build the offline installer
-│   ├── verify_offline.sh         ★ Offline acceptance test
-│   ├── build_pkg_from_commit.sh   Build from a git commit (advanced)
-│   └── freeze.sh                  Pin package versions (reproducible builds)
+├─ 📄 README.md          User guide (CN + EN)
+├─ 📄 SKILL.md           Agent manual (orchestration only)
+├─ 📄 LICENSE            LGPL-3.0
+├─ 📄 HANDOFF.md         Sign-off checklist
 │
-├── assets/                       ← conda constructor recipe
-│   ├── construct.yaml            ★ Jinja2 template defining installer contents
-│   ├── pre_install.sh            Runtime pre-install notes
-│   └── post_install.sh           Post-install guidance
+├─ 📁 scripts/           Frozen scripts (never hand-write commands)
+│  ├─ ⭐ build.sh        Build entry point
+│  ├─ ⭐ verify_offline  Acceptance entry point
+│  ├─    build_pkg_      Git commit → conda package (advanced)
+│  │     from_commit.sh
+│  └─    freeze.sh       Pin versions → reproducible builds
 │
-├── examples/                     ← Verification data
-│   └── verify-input.json         Minimal training config (v2 format)
+├─ 📁 assets/            constructor recipe
+│  ├─ ⭐ construct.yaml  Jinja2 template → bill of materials
+│  ├─    pre_install.sh  Pre-install notes
+│  └─    post_install.sh Post-install guidance
 │
-├── evals/                        ← Quality benchmarks
-│   ├── README.md
-│   ├── prompts.md
-│   ├── assertions.md
-│   ├── run_build_verify.sh
-│   └── run_agent_benchmark.sh
+├─ 📁 examples/          Verification data
+│  └─    verify-input    Minimal training config (v2 format)
+│        .json
 │
-└── references/
-    └── notes.md                  Detailed technical docs
+├─ 📁 evals/             Quality benchmarks
+│  ├─    README / prompts / assertions
+│  ├─    run_build_      Script-level stability
+│  │     verify.sh
+│  └─    run_agent_      Agent-level stability
+│        benchmark.sh
+│
+└─ 📁 references/
+   └─    notes.md        Deep-dive & troubleshooting
 ```
 
 ### Prerequisites
@@ -384,14 +455,47 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 ### Verification Flow
 
 ```
-1. Isolate network (unshare -rn or docker --network none)
-2. Install .sh into throwaway prefix
-3. Smoke: dp -h / lmp -h / import deepmd / version check
-4. GPU (auto): nvidia-smi / TF-GPU / JAX-GPU / XLA libdevice proof
-5. End-to-end:
-   ├── Bundled example → real 192-atom water training + lammps inference
-   └── No example → synthetic data, 10-step training + lammps inference
-6. All gates pass → exit 0
+    Input: .sh installer + expected version
+    ═══════════════════════════════════════
+
+    ┌──────────────────────────────────────────┐
+    │           ① Network Isolation            │
+    │     unshare -rn  /  docker --network none │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │           ② Offline Install              │
+    │     bash xxx.sh -b -p /tmp/dpenv         │
+    │     source /tmp/dpenv/bin/activate        │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │           ③ Smoke Tests                  │
+    │  ✅ dp -h      ✅ lmp -h                  │
+    │  ✅ import deepmd    ✅ version check      │
+    │  [GPU] ✅ nvidia-smi ✅ GPU visible        │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │         ④ dp train + freeze              │
+    │  ┌─ Bundled example ────────────────────┐│
+    │  │  192 atoms × 200 frames (real DFT)    ││
+    │  └──────────────────────────────────────┘│
+    │  ┌─ No example ─────────────────────────┐│
+    │  │  6 atoms × 10 frames (synthetic)      ││
+    │  └──────────────────────────────────────┘│
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │         ⑤ LAMMPS Inference               │
+    │     lmp -in in.lammps                    │
+    │     load frozen model → MD 3 steps        │
+    └──────────────────┬───────────────────────┘
+                       ▼
+    ┌──────────────────────────────────────────┐
+    │          VERIFY PASSED  ✅               │
+    │     exit 0 = all gates passed             │
+    └──────────────────────────────────────────┘
 ```
 
 ### Post-Install Capabilities
