@@ -121,6 +121,18 @@ bash scripts/verify_offline.sh dist/*.sh <期望版本号>
 bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1.3
 ```
 
+### 已验证的组合
+
+以下组合已在 Bohrium 平台通过端到端验证（离线安装 → dp train → dp freeze → lammps 推理）：
+
+| deepmd-kit 版本 | CPU/GPU | 后端 | 备注 |
+|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | ✅ 通过 |
+| 3.2.0b0 | CPU | TF + JAX + PyTorch | ✅ 通过，dpa4 真实数据 |
+| 3.2.0b0 | GPU (cuda129) | TF + JAX + PyTorch | ✅ 通过，4×V100 加速 10× |
+
+> **关于多 CUDA 版本**：`--cuda` 参数支持任意版本号，但实际可用的版本取决于 conda-forge 上发布的 deepmd-kit 包。目前仅有 cuda129 一个 GPU 包可用（由 [Jinzhe Zeng](https://github.com/njzjz) 维护）。后续 conda-forge 发布更多 CUDA 变体后，改 `--cuda` 参数值即可直接构建。
+
 ### 完整参数列表
 
 | 标志 | 含义 | 默认值 |
@@ -309,6 +321,18 @@ bash scripts/build.sh --version 3.1.3 --example dpa4
 # Verify (auto-detects GPU from filename)
 bash scripts/verify_offline.sh dist/*.sh <expected_version>
 ```
+
+### Verified Combinations
+
+All verified end-to-end on Bohrium (offline install → dp train → dp freeze → lammps inference):
+
+| deepmd-kit version | CPU/GPU | Backends | Notes |
+|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | ✅ Passed |
+| 3.2.0b0 | CPU | TF + JAX + PyTorch | ✅ Passed, dpa4 smoke test |
+| 3.2.0b0 | GPU (cuda129) | TF + JAX + PyTorch | ✅ Passed, 4×V100, 10× speedup |
+
+> **Multi-CUDA support**: `--cuda` accepts any version number, but actual availability depends on conda-forge deepmd-kit packages (maintained by [Jinzhe Zeng](https://github.com/njzjz)). Currently only cuda129 is available. Additional CUDA variants will work as soon as they are published — just change the `--cuda` value.
 
 ### Full Parameter Reference
 
