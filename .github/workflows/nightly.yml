@@ -1,0 +1,96 @@
+name: Nightly Build
+
+# PyTorch-style automated nightly builds for DeePMD-kit offline installers.
+# Builds multiple CUDA variants in parallel, uploads artifacts, updates manifest.
+
+on:
+  schedule:
+    - cron: '17 2 * * *'    # daily at 2:17 UTC (off-peak, avoids :00/:30 thundering herd)
+  push:
+    branches: [main]
+    paths:
+      - 'assets/construct.yaml'
+      - 'assets/version.txt'
+      - 'scripts/build.sh'
+  workflow_dispatch:         # manual trigger from GitHub Actions UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: CPU
+            cuda: ''
+          - label: CUDA 12.9
+            cuda: '12.9'
+          # Uncomment when conda-forge publishes these variants:
+          # - label: CUDA 12.6
+          #   cuda: '12.6'
+          # - label: CUDA 12.8
+          #   cuda: '12.8'
+          # - label: CUDA 13.1
+          #   cuda: '13.1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: '3.11'
+          auto-update-conda: true
+
+      - name: Install constructor
+        run: conda install constructor conda-libmamba-solver -y
+
+      - name: Build offline installer
+        run: |
+          mkdir -p dist
+          bash scripts/build.sh \
+            --version $(cat assets/version.txt) \
+            ${CUDA_FLAG} \
+            --backend all \
+            --torch-version ">=2.5"
+        env:
+          CUDA_FLAG: ${{ matrix.cuda && format('--cuda {0}', matrix.cuda) || '' }}
+
+      - name: Show artifacts
+        run: |
+          echo "=== Built installers ==="
+          find dist/ -name "*.sh" -exec ls -lh {} \;
+          echo "=== Manifest ==="
+          cat dist/*/manifest-*.txt 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepmd-kit-${{ matrix.label == 'CPU' && 'cpu' || format('cuda{0}', matrix.cuda) }}
+          path: dist/*/deepmd-kit-*.sh
+          retention-days: 30
+
+  update-manifest:
+    name: Update manifest.json
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Commit updated manifest
+        run: |
+          DATE=$(date +%Y%m%d)
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          echo "Nightly $DATE @ $SHORT_SHA — artifacts at:"
+          echo "  https://github.com/Isaiah-WU/deepmd-offline-installer-skill/actions/runs/${{ github.run_id }}"
+
+  pass:
+    name: Pass
+    needs: [build, update-manifest]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
