@@ -27,11 +27,10 @@ red()   { printf "\033[31m%s\033[0m" "\n$*" >&2; }
 warn()  { printf "\033[33m%s\033[0m" "$*" >&2; }
 
 detect_cuda() {
-  if command -v nvidia-smi >/dev/null 2>&1; then
-    nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 | cut -d. -f1,2
-  else
-    echo ""
-  fi
+  command -v nvidia-smi >/dev/null 2>&1 || { echo ""; return; }
+  # The driver's max-supported CUDA version is printed in `nvidia-smi` header
+  # as "CUDA Version: XX.Y" — NOT the driver_version field (e.g. 580.105).
+  nvidia-smi 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1
 }
 
 download_manifest() {
@@ -45,20 +44,23 @@ download_manifest() {
 
 pick_variant() {
   local manifest="$1" tool="$2" cuda="$3"
-  # Try exact CUDA match first, then fallback to cpu
   if [[ -n "$cuda" ]]; then
+    # Exact match wins
     local key="cuda${cuda//./}"
-    if echo "$manifest" | grep -q "\"$key\""; then
-      echo "$key"
-      return
-    fi
-    # Try nearest match: find the closest CUDA version ≤ requested
-    for v in 13.1 12.9 12.8 12.6 12.4 12.1; do
-      if echo "$manifest" | grep -q "\"cuda${v//./}\""; then
-        echo "cuda${v//./}"
-        return
+    if echo "$manifest" | grep -q "\"$key\""; then echo "$key"; return; fi
+    # Otherwise pick the HIGHEST available CUDA package that is <= driver's CUDA.
+    # NVIDIA is backward-compatible: a cuda128 build runs on a 13.0 driver,
+    # but a cuda131 build will NOT run on a 13.0 driver.
+    local want_num best="" best_num=0
+    want_num=$(awk "BEGIN{printf \"%d\", $cuda*10}")
+    for v in 13.1 13.0 12.9 12.8 12.6 12.4 12.1; do
+      echo "$manifest" | grep -q "\"cuda${v//./}\"" || continue
+      local vn; vn=$(awk "BEGIN{printf \"%d\", $v*10}")
+      if [[ "$vn" -le "$want_num" && "$vn" -gt "$best_num" ]]; then
+        best="cuda${v//./}"; best_num="$vn"
       fi
     done
+    if [[ -n "$best" ]]; then echo "$best"; return; fi
   fi
   echo "cpu"
 }
