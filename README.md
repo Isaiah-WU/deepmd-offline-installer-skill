@@ -94,8 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-
 dpack install dp
 
 # 2b. 离线安装（超算无网）：指向已拷贝到本地的 .sh 包
-dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
-#   分片包也行：给主名，dpack 自动 cat 合并 .0 .1 .2
+#     分片包也行——给主文件名，dpack 自动 cat 合并 .0 .1 .2
 dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
 
 # 查看已装工具
@@ -366,21 +365,21 @@ deepmd-offline-installer-skill/
 ### One-Line Install (Recommended)
 
 ```bash
-# 1. Install dpack
-curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/dpack -o /usr/local/bin/dpack
-chmod +x /usr/local/bin/dpack
+# 1. Install dpack (into your user dir — no root)
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/install.sh | bash
 
-# 2. One command to install DeePMD-kit (auto-detects GPU and CUDA)
+# 2a. Online: auto-detect GPU/CUDA -> download -> install
 dpack install dp
 
-# Or specify CUDA version
-dpack install dp --cuda 12.8
+# 2b. Offline (air-gapped HPC): install from a local .sh you copied over
+#     Split parts work too — give the main name, dpack reassembles .0 .1 .2
+dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
 
 # List installed tools
 dpack list
 ```
 
-> dpack is a lightweight package manager for the DeepModeling ecosystem. Future support: `dpack install dpgen`, `dpack upgrade dp`, etc. Pixi-like UX, PyTorch-like one-line install.
+> **Built for HPC**: dpack installs to your user dir (no root), and `--file` mode needs no network. Like dp1s's one-line install + pixi UX. Future: `dpack install dpgen`, `dpack upgrade dp`, etc.
 
 ### Build Your Own Offline Packages
 
