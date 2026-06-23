@@ -120,39 +120,52 @@ cmd_install() {
   # Pick best variant
   local variant
   variant="$(pick_variant "$manifest" "$tool" "$cuda")"
-  local url sha
-  url="$(echo "$manifest" | python3 -c "
+  # A variant has EITHER a single "url" OR a list of "parts" (split installers,
+  # because GitHub caps a release asset at 2 GiB). Extract both + sha256.
+  local urls sha
+  urls="$(echo "$manifest" | python3 -c "
 import json,sys
-m=json.load(sys.stdin)
-v=m['tools']['$tool']['variants']['$variant']
-print(v['url'])
+v=json.load(sys.stdin)['tools']['$tool']['variants']['$variant']
+parts=v.get('parts')
+print('\n'.join(parts) if parts else v.get('url',''))
 " 2>/dev/null || echo "")"
   sha="$(echo "$manifest" | python3 -c "
 import json,sys
-m=json.load(sys.stdin)
-v=m['tools']['$tool']['variants']['$variant']
-print(v.get('sha256',''))
+print(json.load(sys.stdin)['tools']['$tool']['variants']['$variant'].get('sha256',''))
 " 2>/dev/null || echo "")"
 
-  if [[ -z "$url" ]]; then
+  if [[ -z "$urls" ]]; then
     red "No installer found for $tool ($variant). Available:"
     echo "$manifest" | python3 -c "
 import json,sys
-m=json.load(sys.stdin)
-for k,v in m['tools']['$tool']['variants'].items():
+for k,v in json.load(sys.stdin)['tools']['$tool']['variants'].items():
     print(f'    {k} (cuda={v.get(\"cuda\",\"cpu\")})')
 " 2>/dev/null || echo "    (could not parse manifest)"
     exit 1
   fi
 
   echo "  Selected: $(bold "$tool") variant $(green "$variant")"
-  echo "  Downloading from $url ..."
   mkdir -p "$CACHE_DIR"
   local installer="$CACHE_DIR/${tool}-${variant}.sh"
-  curl -fSL --progress-bar "$url" -o "$installer" || {
-    red "Download failed. The installer may not be released yet."
-    exit 1
-  }
+  local n; n="$(echo "$urls" | wc -l)"
+  if [[ "$n" -gt 1 ]]; then
+    echo "  Downloading $n split parts and reassembling ..."
+    : > "$installer"
+    local i=0
+    while IFS= read -r part_url; do
+      echo "    part $((++i))/$n ..."
+      curl -fSL --progress-bar "$part_url" >> "$installer" || {
+        red "Download failed on part $i. The installer may not be released yet."
+        exit 1
+      }
+    done <<< "$urls"
+  else
+    echo "  Downloading from $urls ..."
+    curl -fSL --progress-bar "$urls" -o "$installer" || {
+      red "Download failed. The installer may not be released yet."
+      exit 1
+    }
+  fi
 
   # Verify sha256 if available
   if [[ -n "$sha" ]]; then
