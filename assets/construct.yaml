@@ -40,7 +40,11 @@ specs:
 - conda
 {% if cuda_version %}
 - cuda-version {{ cuda_version }}
-- njzjz/noarch::libdevice-hack-for-tensorflow
+# libdevice-hack symlinks libdevice.10.bc into the pip-wheel layout TF>=2.19
+# expects. Pin the py_5 build (cuda-nvvm based) so the legacy cudatoolkit py_3
+# build can never be selected, and pull cuda-nvvm so the real target exists.
+- njzjz/noarch::libdevice-hack-for-tensorflow=*=py_5
+- cuda-nvvm
 - openmpi
 {% endif %}
 - libblas * *mkl
