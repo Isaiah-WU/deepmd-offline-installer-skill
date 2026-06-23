@@ -153,15 +153,20 @@ for k,v in json.load(sys.stdin)['tools']['$tool']['variants'].items():
     : > "$installer"
     local i=0
     while IFS= read -r part_url; do
-      echo "    part $((++i))/$n ..."
-      curl -fSL --progress-bar "$part_url" >> "$installer" || {
-        red "Download failed on part $i. The installer may not be released yet."
+      i=$((i+1))
+      echo "    part $i/$n ..."
+      local pf="$CACHE_DIR/${tool}-${variant}.part$i"
+      # --retry + -C - (resume) survive flaky GitHub large-file connections.
+      curl -fSL --retry 5 --retry-delay 3 -C - --progress-bar "$part_url" -o "$pf" || {
+        red "Download failed on part $i after retries. Re-run; finished parts are cached."
         exit 1
       }
     done <<< "$urls"
+    cat "$CACHE_DIR/${tool}-${variant}".part[0-9]* > "$installer"
+    rm -f "$CACHE_DIR/${tool}-${variant}".part[0-9]*
   else
     echo "  Downloading from $urls ..."
-    curl -fSL --progress-bar "$urls" -o "$installer" || {
+    curl -fSL --retry 5 --retry-delay 3 -C - --progress-bar "$urls" -o "$installer" || {
       red "Download failed. The installer may not be released yet."
       exit 1
     }
