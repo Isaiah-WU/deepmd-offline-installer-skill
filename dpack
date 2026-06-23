@@ -3,14 +3,15 @@
 # One command to install any DeepModeling tool: dp, dpgen, ...
 #
 # Usage:
-#   dpack install dp                  # auto-detect CUDA, latest version
+#   dpack install dp                  # auto-detect CUDA, download + install
 #   dpack install dp --cuda 12.8      # explicit CUDA version
-#   dpack install dp --backend pytorch # explicit backend
-#   dpack install dp --cuda 12.8 --version 3.2.0b0
+#   dpack install dp --file ./xxx.sh  # OFFLINE: install from a local .sh (no network)
+#   dpack install dp --prefix ~/dp    # custom install location
 #   dpack list                         # show installed tools
 #   dpack help                         # show this message
 #
-# Design: curl | bash installs dpack itself, then dpack installs tools.
+# Design: install dpack to your user dir, then dpack installs tools.
+# Works WITHOUT root and WITHOUT network (--file mode) — built for HPC.
 # Like pixi / brew but for the DeepModeling ecosystem.
 
 set -euo pipefail
@@ -66,20 +67,40 @@ pick_variant() {
 }
 
 cmd_install() {
-  local tool="${1:-}" cuda="" version=""
+  local tool="${1:-}" cuda="" version="" localfile="" prefix="${DPACK_PREFIX:-$HOME/deepmd-kit}"
   shift || true
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --cuda)     cuda="$2"; shift 2 ;;
       --version)  version="$2"; shift 2 ;;
+      --file)     localfile="$2"; shift 2 ;;
+      --prefix)   prefix="$2"; shift 2 ;;
       --backend)  shift 2 ;;  # future: per-backend download
       *)          shift ;;
     esac
   done
 
   if [[ -z "$tool" ]]; then
-    red "Usage: dpack install <tool> [--cuda <ver>] [--version <ver>]"
+    red "Usage: dpack install <tool> [--cuda <ver>] [--file <path>] [--prefix <dir>]"
     exit 1
+  fi
+
+  # ── OFFLINE mode: install from a local .sh (or its split parts) ──────────────
+  if [[ -n "$localfile" ]]; then
+    # Auto-reassemble split parts: if given foo.sh and foo.sh.0 exists, cat them.
+    if [[ ! -f "$localfile" && -f "${localfile}.0" ]]; then
+      echo "  Reassembling split parts ${localfile}.* ..."
+      cat "${localfile}".[0-9]* > "$localfile"
+    fi
+    [[ -f "$localfile" ]] || { red "File not found: $localfile"; exit 1; }
+    echo "  Offline install from $(bold "$localfile")"
+    echo "  Installing $tool to $prefix ..."
+    bash "$localfile" -b -p "$prefix"
+    record_install "$tool" "local" "$cuda" "$prefix"
+    echo ""
+    echo "  $(green "✓") $tool installed to $(bold "$prefix")"
+    echo "  Activate: source $prefix/bin/activate $prefix"
+    return
   fi
 
   # Auto-detect CUDA
@@ -145,19 +166,21 @@ for k,v in m['tools']['$tool']['variants'].items():
   fi
 
   # Install
-  echo "  Installing $tool ..."
-  local prefix="${DPACK_PREFIX:-$HOME/deepmd-kit}"
+  echo "  Installing $tool to $prefix ..."
   bash "$installer" -b -p "$prefix"
-
-  # Record
-  mkdir -p "$DPACK_HOME"
-  echo "{\"tool\":\"$tool\",\"variant\":\"$variant\",\"cuda\":\"$cuda\",\"prefix\":\"$prefix\",\"installed_at\":\"$(date -Iseconds)\"}" > "$DPACK_HOME/installed-$tool.json"
-  echo "$tool $variant $prefix" >> "$INSTALLED_DB" 2>/dev/null || true
+  record_install "$tool" "$variant" "$cuda" "$prefix"
 
   echo ""
   echo "  $(green "✓") $tool installed to $(bold "$prefix")"
   echo "  Activate: source $prefix/bin/activate $prefix"
   echo "  Verify:   dp --version"
+}
+
+record_install() {
+  local tool="$1" variant="$2" cuda="$3" prefix="$4"
+  mkdir -p "$DPACK_HOME"
+  echo "{\"tool\":\"$tool\",\"variant\":\"$variant\",\"cuda\":\"$cuda\",\"prefix\":\"$prefix\"}" > "$DPACK_HOME/installed-$tool.json"
+  echo "$tool $variant $prefix" >> "$INSTALLED_DB" 2>/dev/null || true
 }
 
 cmd_list() {

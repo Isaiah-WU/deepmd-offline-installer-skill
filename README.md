@@ -87,21 +87,22 @@ deepmd-offline-installer-skill/
 ### 一键安装（推荐）
 
 ```bash
-# 1. 装 dpack
-curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/dpack -o /usr/local/bin/dpack
-chmod +x /usr/local/bin/dpack
+# 1. 装 dpack（装到用户目录，不需要 root）
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/install.sh | bash
 
-# 2. 一行装 DeePMD-kit（自动检测 GPU 和 CUDA 版本）
+# 2a. 在线安装：自动检测 GPU/CUDA → 下载 → 安装
 dpack install dp
 
-# 或指定 CUDA 版本
-dpack install dp --cuda 12.8
+# 2b. 离线安装（超算无网）：指向已拷贝到本地的 .sh 包
+dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
+#   分片包也行：给主名，dpack 自动 cat 合并 .0 .1 .2
+dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
 
 # 查看已装工具
 dpack list
 ```
 
-> dpack 是 DeepModeling 社区的轻量包管理器。以后 `dpack install dpgen`、`dpack install <采样>`、`dpack upgrade dp` 逐步支持。对标 PyTorch 的一行安装 + pixi 的体验。
+> **为超算设计**：dpack 装在用户目录（无需 root），离线 `--file` 模式不需要网络。对标 dp1s 的一行安装、pixi 的体验。以后 `dpack install dpgen`、`dpack upgrade dp` 逐步支持。
 
 ### 构建自己的离线包
 
