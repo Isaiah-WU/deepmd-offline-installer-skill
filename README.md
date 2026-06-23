@@ -207,6 +207,14 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 | ubuntu22.04-py3.10 | dpack 在线 + 离线 | ✅ |
 | ubuntu24.04-py3.12 | dpack 在线（下载→合并→校验→装） | ✅ |
 
+**多 CUDA 版本**（同一台 13.0 驱动节点上，验证针对不同 CUDA 编译的包都能 GPU 可用——靠 NVIDIA 向后兼容）
+
+| CUDA 编译版本 | 来源 | 验证 | 状态 |
+|---|---|---|---|
+| CUDA 12.6 | deepmd 3.1.1 `cuda126` | `torch.version.cuda=12.6` + GPU 可用 True | ✅ |
+| CUDA 12.9 | deepmd 3.2.0b0 `cuda129` | train + freeze + lammps 全流程 | ✅ |
+| CUDA 12.8 / 13.1 | — | conda-forge 任何 deepmd 版本都未发布 | ⛔ 需源码编 |
+
 **端到端流程**（`unshare -rn` 切网 → 安装 → train → freeze → lammps）
 
 | deepmd-kit | 变体 | 后端 | 训练数据 | 状态 |
