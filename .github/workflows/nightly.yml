@@ -109,14 +109,22 @@ jobs:
           # install-libstdc++.sh) that must not be uploaded.
           find dist -type f \( -name 'deepmd-kit-*.sh' -o -name 'deepmd-kit-*.sh.[0-9]*' \) -exec ls -lh {} \;
 
-      - name: Upload installer to the Release
+      - name: Upload installer to the Release (keep only latest per variant)
         env:
           GH_TOKEN: ${{ github.token }}
+          VARIANT: ${{ matrix.label }}
         run: |
           TAG="v$(cat assets/version.txt)"
-          # A --split build leaves BOTH the parts (.0/.1/.2) and the original
-          # full .sh. Upload ONLY the parts when they exist (the full file is
-          # >2GiB and GitHub rejects it); otherwise upload the single .sh.
+          # Keep-latest: delete any existing assets for THIS variant (old-named or
+          # earlier dates) before uploading the new dated build. The variant name
+          # sits right before '-Linux', so '-<variant>-Linux' is a precise anchor.
+          # cpu runs only touch cpu assets; cuda129 only cuda129 — no cross-delete.
+          gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null \
+            | grep -E "^deepmd-kit-.*-${VARIANT}-Linux" \
+            | while read -r a; do echo "removing old: $a"; gh release delete-asset "$TAG" "$a" -y; done || true
+          # A --split build leaves BOTH the parts (.0/.1/.2) and the original full
+          # .sh. Upload ONLY the parts when present (the full file is >2GiB and
+          # GitHub rejects it); otherwise upload the single .sh.
           mapfile -t parts < <(find dist -type f -name 'deepmd-kit-*.sh.[0-9]*' | sort)
           if [ ${#parts[@]} -gt 0 ]; then
             files=("${parts[@]}")
