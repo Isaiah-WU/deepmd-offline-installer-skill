@@ -41,9 +41,31 @@ dp --version
 | 命令 | 作用 |
 |------|------|
 | `dpack install dp` | 在线安装：自动选版本 → 下载 → 装 |
-| `dpack install dp --file <pkg.sh>` | 离线安装：从本地离线包安装（支持分片，自动合并） |
+| `dpack install dp --file <pkg.sh>` | 离线安装：从本地离线包安装 |
 | `dpack install dp --prefix <dir>` | 指定安装目录 |
 | `dpack list` | 查看已安装的工具 |
+
+#### 离线安装与分片包
+
+GPU 离线包很大（约 6 GB），超过 GitHub 单文件 2 GB 上限，所以被切成 3 片：
+`...sh.0`、`...sh.1`、`...sh.2`。**你不用手动合并——`--file` 指向去掉 `.0` 的"基础文件名"，dpack 会自动把同目录下的分片拼好再安装。**
+
+```bash
+# 情况一：单个完整 .sh（CPU 包，没切片）—— 直接指它
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-8f40cf6-cpu-Linux-x86_64.sh
+
+# 情况二：分片包（GPU 包）—— 把 3 片放同一个目录：
+#   deepmd-kit-...-cuda129-Linux-x86_64.sh.0
+#   deepmd-kit-...-cuda129-Linux-x86_64.sh.1
+#   deepmd-kit-...-cuda129-Linux-x86_64.sh.2
+# 然后 --file 指向【不带 .0 的基础名】，dpack 自动 cat 合并再装：
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-8f40cf6-cuda129-Linux-x86_64.sh
+#                              ↑ 注意：结尾是 .sh，不是 .sh.0
+```
+
+> 超算场景：在有网机器从 [Release](https://github.com/Isaiah-WU/deepmd-dpack/releases) 下载 3 片 →
+> U 盘拷到断网机器同一目录 → 上面那条命令一行装好（无需联网、无需 root）。
+> 也可以手动合并：`cat *.sh.0 *.sh.1 *.sh.2 > full.sh && bash full.sh -b -p /opt/deepmd`。
 
 ### 4 · 支持的工具
 
@@ -197,9 +219,30 @@ dp --version
 | Command | What it does |
 |---------|--------------|
 | `dpack install dp` | Online install: auto-pick variant → download → install |
-| `dpack install dp --file <pkg.sh>` | Offline install from a local package (split parts auto-reassembled) |
+| `dpack install dp --file <pkg.sh>` | Offline install from a local package |
 | `dpack install dp --prefix <dir>` | Install to a specific directory |
 | `dpack list` | List installed tools |
+
+#### Offline install & split packages
+
+A GPU package is large (~6 GB) and exceeds GitHub's 2 GB per-file limit, so it ships as 3 parts:
+`...sh.0`, `...sh.1`, `...sh.2`. **You don't merge them by hand — point `--file` at the base name
+(without `.0`) and dpack reassembles the parts in that directory before installing.**
+
+```bash
+# Case 1: a single complete .sh (CPU package, not split) — point at it directly
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-8f40cf6-cpu-Linux-x86_64.sh
+
+# Case 2: a split package (GPU) — put the 3 parts in one directory:
+#   deepmd-kit-...-cuda129-Linux-x86_64.sh.0 / .sh.1 / .sh.2
+# then point --file at the BASE name (no .0); dpack cats them and installs:
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-8f40cf6-cuda129-Linux-x86_64.sh
+#                              ↑ note: ends in .sh, not .sh.0
+```
+
+> HPC flow: download the 3 parts from the [Release](https://github.com/Isaiah-WU/deepmd-dpack/releases)
+> on a networked machine → copy them into one directory on the air-gapped machine → run the command
+> above (no network, no root). Or merge manually: `cat *.sh.0 *.sh.1 *.sh.2 > full.sh && bash full.sh -b -p /opt/deepmd`.
 
 ### 4 · Supported Tools
 
