@@ -45,6 +45,18 @@
           ],
           "sha256": "4ec7e7dd5a9d519cbc84672860ee86410df52dade28252ff814db56e4ca70379"
         },
+        "cuda130": {
+          "type": "gpu",
+          "cuda": "13.0",
+          "backend": "pytorch",
+          "note": "Mode C (conda-pack self-extracting). PyTorch GPU backend (CUDA 13.0); CPU-only TensorFlow bundled to load the LAMMPS plugin.",
+          "parts": [
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-f7512c5-cuda130-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-f7512c5-cuda130-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-f7512c5-cuda130-Linux-x86_64.sh.2"
+          ],
+          "sha256": "a864cd596954c9f475b232a79a1e679c63b5deb9b5cef6d83f0c5c4ad8bcb06c"
+        },
         "cpu": {
           "type": "cpu",
           "cuda": null,
