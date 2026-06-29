@@ -22,7 +22,7 @@ on:
       variant:
         description: '构建哪个变体(首次测试建议先单个,如 cu126)'
         type: choice
-        options: [all, cu126, cu128, cu130]
+        options: [all, cu126, cu128]
         default: all
 
 # 最小权限:顶层只读。
@@ -45,12 +45,12 @@ jobs:
           V="${{ github.event.inputs.variant || 'all' }}"
           A='{"label":"cuda126","cu":"cu126","cuda":"12.6"}'
           B='{"label":"cuda128","cu":"cu128","cuda":"12.8"}'
-          C='{"label":"cuda130","cu":"cu130","cuda":"13.0"}'
+          # cuda130(CUDA 13)已弃:deepmd 的 LAMMPS 插件是 CUDA 12 编译的,与 CUDA 13 的 torch
+          # 同进程会让 torch JIT 内核崩;CUDA 12 的包(cu126/128)靠驱动向后兼容已覆盖 13.x 机器。
           case "$V" in
             cu126) M="[$A]" ;;
             cu128) M="[$B]" ;;
-            cu130) M="[$C]" ;;
-            *)     M="[$A,$B,$C]" ;;
+            *)     M="[$A,$B]" ;;
           esac
           echo "matrix={\"include\":$M}" >> "$GITHUB_OUTPUT"
 

@@ -50,6 +50,11 @@ echo "==> [3/7] 装 tensorflow-cpu==$TF_VER(加载 lmp 插件必须)+ lammps whe
 "$ENV/bin/pip" install --no-deps "$LAMMPS_SPEC"
 "$ENV/bin/pip" cache purge >/dev/null 2>&1 || true   # 回收 ~数 GB pip 缓存,降磁盘峰值
 
+# 注意:本配方只适用于 CUDA 12.x(cu126/cu128 等)。deepmd-kit 3.2.0b0 的 LAMMPS 插件是对着
+# CUDA 12 编译的(运行时 dlopen libcudart.so.12),与 CUDA 13 的 torch 在同进程里会让 torch 的
+# JIT 融合内核崩溃(实测 cuda130 的 lammps 时好时坏)。CUDA 12 的包靠驱动向后兼容已覆盖 13.x
+# 机器,故不构建 CUDA 13 变体。若将来 deepmd 出 CUDA 13 构建,再加。
+
 echo "==> [4/7] 自检"
 if [ -z "${SKIP_GPU_CHECK:-}" ]; then
   # 本地/玻尔:完整 GPU 自检
