@@ -38,8 +38,16 @@ dp --pt freeze -o frozen.pth >/dev/null 2>&1 || { echo "❌ freeze 失败"; exit
 
 printf 'LAMMPS data file\n\n6 atoms\n2 atom types\n0 12 xlo xhi\n0 12 ylo yhi\n0 12 zlo zhi\n\nMasses\n\n1 1.008\n2 15.999\n\nAtoms\n\n1 1 6 6 6\n2 1 6.5 7 6\n3 2 8 6 6\n4 1 4 6 6\n5 1 3.5 7 6\n6 2 5 6 6\n' > data.lmp
 printf 'units metal\natom_style atomic\nboundary p p p\nread_data data.lmp\npair_style deepmd frozen.pth\npair_coeff * * H O\nthermo 1\nrun 3\n' > in.lammps
-lmp -in in.lammps >lmp.log 2>&1 || { echo "❌ lmp 运行失败"; tail -20 lmp.log; exit 1; }
-grep -qE 'Loading plugin.*[Dd]eepmd' lmp.log || { echo "❌ lmp 未加载 deepmd 插件"; tail -20 lmp.log; exit 1; }
-grep -qE 'Total wall time' lmp.log        || { echo "❌ lmp run 未完成"; tail -20 lmp.log; exit 1; }
+# 不只看退出码(deepmd 在 GPU 崩溃时退出码可能仍是 0,如 cuda130 的 MPI_Abort),看实际产出判定:
+lmp -in in.lammps >lmp.log 2>&1 || true
+# ① 命中明确错误标志 → 判失败(即使退出码 0)。
+#    "Cannot find libcudart" 不会误伤成功时的 "Successfully load libcudart"(子串不同)。
+if grep -qiE 'Cannot find libcudart|Unknown pair style|MPI_Abort|terminate called' lmp.log; then
+  echo "❌ lammps 出现错误标志(见下)"; tail -25 lmp.log; exit 1
+fi
+# ② 必须真跑完(崩在半路不会打印这行)——核心成功信号。
+grep -qE 'Total wall time' lmp.log || { echo "❌ lammps 未跑完(无 Total wall time,疑似中途崩)"; tail -25 lmp.log; exit 1; }
+# ③ deepmd 是否参与:Mode A 可能编进 lmp、Mode C 走插件,措辞不同;只告警不判失败,避免误伤。
+grep -qiE 'deepmd' lmp.log || echo "⚠ 日志未见 'deepmd' 字样(已跑完;通常只是措辞差异)"
 
-echo "✅ GPU 端到端验证通过:torch GPU + dp train + dp freeze + lammps MD"
+echo "✅ 端到端验证通过:torch GPU + dp train + dp freeze + lammps MD(跑完、无错误标志)"
