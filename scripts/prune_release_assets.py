@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""清理滚动 nightly release 里堆积的旧构建。
+"""清理某个 per-version release(tag v<version>)里堆积的旧构建。
 
 对照 PyTorch:它的 nightly 索引只保留最近 ~60 个版本、且【从不删 S3 上的 wheel 文件】。
 GitHub Releases 相反——资产持久、单文件 2GiB 上限、会无限堆积,所以【必须我们自己删】。
 
-策略(单一 nightly tag 内):
+策略(单个 per-version release 内):
   - 每个变体只保留最近 KEEP_BUILDS 个【日期构建】;
   - 外加【live manifest.json 仍在引用的任何构建,绝不删】(= dpack 当前在发的,对应 PyTorch
     从不删被索引的 wheel);
@@ -84,8 +84,9 @@ while True:
     page += 1
 
 # ── 分组:variant -> base(.sh)-> [(name, id)];记录每个 base 的日期 ───────────
+# 尾部 .N 可选:GPU 包分片为 .sh.0/.1/.2;cpu 是单个不分片 .sh —— 两者都要能识别并被清理。
 pat = re.compile(
-    r"^(?P<base>deepmd-kit-.+?-(?P<date>\d{8})-[^-]+-(?P<variant>cuda\d+|cpu)-Linux-x86_64\.sh)\.(?P<idx>\d+)$"
+    r"^(?P<base>deepmd-kit-.+?-(?P<date>\d{8})-[^-]+-(?P<variant>cuda\d+|cpu)-Linux-x86_64\.sh)(?:\.(?P<idx>\d+))?$"
 )
 builds = defaultdict(lambda: defaultdict(list))
 dates = {}

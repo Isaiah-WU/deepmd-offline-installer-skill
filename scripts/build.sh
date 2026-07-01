@@ -5,17 +5,19 @@
 # calls this script with parameters. Everything error-prone is frozen here so a
 # weak model produces the same result as a strong one.
 #
-# Two ways to select WHAT deepmd-kit goes in the installer:
+# Two ways to select WHAT deepmd-kit goes in the installer (this script = Modes A/B):
 #   A. By RELEASED VERSION (default): pulls a pre-built conda package by version.
 #   B. By GIT COMMIT: first run scripts/build_pkg_from_commit.sh to build the
 #      commit into a LOCAL conda channel, then pass --from-commit-channel <dir>
 #      here. constructor then bundles that exact commit build.
+# (GPU variants cuda126/cuda128 that conda-forge does NOT publish are built by a
+#  separate script, scripts/build_modec.sh — "Mode C" — not by this constructor path.)
 #
 # Usage:
 #   bash scripts/build.sh [options]
 #
 # Options (ALL optional; zero-arg run = CPU build of the default version):
-#   -v, --version <ver>          deepmd-kit version          (default: $VERSION or 3.1.3)
+#   -v, --version <ver>          deepmd-kit version          (default: assets/version.txt, now 3.2.0b0)
 #   -c, --cuda <ver>             CUDA version, e.g. 12.9;
 #                                empty/omitted = CPU build    (default: $CUDA_VERSION or "")
 #   --torch-version <ver>        pin PyTorch version in the installer (default: none = no torch)
@@ -26,7 +28,7 @@
 #   --from-commit-channel <dir>  local channel from build_pkg_from_commit.sh;
 #                                reads <dir>/COMMIT_BUILD.env to pin version+build+cuda+python
 #   -r, --recipe-dir <dir>       dir containing construct.yaml (default: bundled assets/)
-#   -o, --output-dir <dir>       where to write the installer  (default: ./dist)
+#   -o, --output-dir <dir>       where to write the installer  (default: ./dist/<variant>/)
 #   --split <N>                  split each produced .sh into N parts (GitHub 2GiB cap;
 #                                GPU installers are multi-GB). Reassemble with `cat`.
 #   -h, --help                   show this help
@@ -48,7 +50,7 @@ VERSION_FILE="$SKILL_ROOT/assets/version.txt"
 if [[ -f "$VERSION_FILE" ]]; then
   VERSION="${VERSION:-$(head -1 "$VERSION_FILE" | tr -d '[:space:]')}"
 else
-  VERSION="${VERSION:-3.1.3}"
+  VERSION="${VERSION:-3.2.0b0}"
 fi
 CUDA_VERSION="${CUDA_VERSION:-}"
 RECIPE_DIR="$DEFAULT_RECIPE"

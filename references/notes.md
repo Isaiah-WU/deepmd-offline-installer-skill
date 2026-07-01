@@ -1,5 +1,10 @@
 # DeePMD-kit Offline Installer — Reference Notes
 
+> **范围**:本文件是 **Mode A**(conda constructor,`build.sh` → cpu/cuda129)与
+> **Mode B**(commit → 本地 channel,`build_pkg_from_commit.sh`)的构建/排查参考。
+> GPU 的 cuda126/cuda128 由 **Mode C**(`build_modec.sh`,pip torch + conda-pack)构建,不在本文;
+> 完整架构、nightly 流水线与发布模型见 [verification-log.md](verification-log.md)。
+
 ## Build requirements
 - conda must be installed; constructor is installed on demand.
 - Internet access is required at build time (constructor downloads packages).
@@ -12,15 +17,16 @@
 - VERSION and CUDA_VERSION are read from environment variables by the recipe.
   Empty CUDA_VERSION builds the CPU variant.
 - CPU build is recommended for first runs (fewer dependencies, fewer failures).
-- The .sh installer can be large (~1.4 GB CPU build). Large installers may be
-  split into two files due to GitHub size limits; users join them with `cat`.
+- The .sh installer can be large (GPU builds are multi-GB). Large installers are
+  split into three parts (.sh.0/.1/.2) for GitHub's 2GiB per-asset limit; users
+  join them with `cat` (or let dpack reassemble automatically).
 
 ## Acceptance test (the real "done")
 "constructor produced a .sh" is necessary but NOT sufficient — the installer can
 still fail on a target machine (dependency/channel issues, post_install errors,
 GLIBC/driver mismatch). The real acceptance test is an OFFLINE install:
 ```bash
-bash scripts/verify_offline.sh dist/deepmd-kit-<version>-<variant>-Linux-x86_64.sh <version>
+bash scripts/verify_offline.sh dist/<variant>/*.sh <version>   # 产物在 dist/<variant>/,名为 ...-<YYYYMMDD>-<hash>-...
 ```
 It installs the .sh into a throwaway prefix with the network cut off (unshare/docker)
 and asserts `dp -h`, `lmp -h`, `import deepmd`, and version match. Exit code 0 = pass.
@@ -31,7 +37,7 @@ failure only; the agent should not run them as the normal workflow.
 ```bash
 conda install constructor -y
 cd assets                 # the bundled recipe directory (contains construct.yaml)
-export VERSION=3.1.3
+export VERSION=3.2.0b0
 export CUDA_VERSION=      # empty = CPU
 constructor . --output-dir ../dist
 ```
@@ -43,12 +49,16 @@ constructor downloads packages at build time, so any floating spec can drift.
   label for release builds.
 - Pin major movers via env vars: VERSION, TF_VERSION, LAMMPS_VERSION, FLAX_VERSION.
 - Freeze → pin loop for byte-stable rebuilds:
-  1. Build once: `bash scripts/build.sh --version 3.1.3`
-  2. Capture exact versions: `bash scripts/freeze.sh dist/<installer>.sh`
+  1. Build once: `bash scripts/build.sh --version 3.2.0b0`
+  2. Capture exact versions: `bash scripts/freeze.sh dist/<variant>/<installer>.sh`
   3. Paste the reported exact versions back into construct.yaml specs.
-  The explicit lock (`dist/<installer>.lock.txt`) records exactly what was bundled.
+  The explicit lock (`dist/<variant>/<installer>.lock.txt`) records exactly what was bundled.
 
 ## GPU / CUDA builds
+> 本节是 **Mode A** 的 GPU 构建(constructor → cuda129,conda-forge 每版本唯一的 CUDA 包)。
+> conda-forge 不发布的 cuda126/cuda128 由 **Mode C**(`build_modec.sh`)构建,不走 constructor;
+> cuda131 = cuda128 改名给 13.1 机器。
+
 The CUDA variant is already wired into construct.yaml (extra specs gated on a
 non-empty CUDA_VERSION: `cuda-version`, `njzjz/noarch::libdevice-hack-for-tensorflow`,
 `openmpi`; deepmd-kit/horovod/jaxlib build strings flip `cpu*`→`cuda*`).
@@ -114,14 +124,12 @@ from source FIRST, into a local channel, which constructor then consumes.
   publish per-commit conda packages to a dedicated label, collapsing Stage 1 to
   "point constructor at that channel"** — worth raising with jinzhe.
 
-## Automating the build on every PR (CI)
-The local build can be automated so a new installer is built whenever a PR is
-merged (similar to PyTorch nightly builds). This is done with a CI workflow
-(e.g. GitHub Actions) that runs the same steps as scripts/build.sh:
-1. trigger on merge to the main branch
-2. set up conda + constructor
-3. run constructor with the desired VERSION / CUDA_VERSION
-4. upload the resulting .sh to the release page
+## Automating the build (CI)
+The live CI is [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) (PyTorch-nightly-style):
+1. runs daily (cron) or on manual `workflow_dispatch`
+2. detects the latest deepmd-kit on PyPI (`detect_latest_deepmd.py`); builds only when it changed
+3. builds the FULL matrix — cpu/cuda129 (Mode A) + cuda126/cuda128 (Mode C) + a cuda131 alias — on a no-GPU runner
+4. runs a no-GPU smoke test per variant, uploads dated split parts to the per-version Release (tag `v<version>`)
+5. a `manifest` job merges the fragments and commits `assets/manifest.json` directly
 
-A minimal GitHub Actions workflow template is provided in
-assets/build-on-merge.yml as a starting point.
+There is no per-night GPU verify lane; see [verification-log.md](verification-log.md) for the full design and rationale.

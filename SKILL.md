@@ -1,7 +1,10 @@
 ---
 name: deepmd-offline-installer
 description: >
-  Build a DeePMD-kit offline installer (.sh) locally using conda constructor.
+  Build a DeePMD-kit offline installer (.sh) locally. CPU and the one conda-forge
+  CUDA build (cuda129) use conda constructor (Mode A); a git commit uses a
+  from-source local channel (Mode B); GPU variants conda-forge does NOT publish
+  (cuda126 / cuda128) use a pip-torch + conda-pack path (Mode C, scripts/build_modec.sh).
   Produces a self-contained installer that installs deepmd-kit, lammps and all
   dependencies on machines without internet access.
   USE WHEN the user wants to build, make, or create a DeePMD-kit offline
@@ -11,7 +14,7 @@ compatibility: Requires conda. Internet access needed at build time. Builds CPU 
 license: LGPL-3.0-or-later
 metadata:
   author: Isaiah-WU
-  version: '1.3'
+  version: '1.4'
 ---
 
 # DeePMD-kit Offline Installer (local build)
@@ -27,13 +30,13 @@ Do NOT write build commands by hand. Call the bundled scripts with parameters.
 **Mode A — package a RELEASED version (CPU or GPU):**
 
 ```bash
-# CPU
-bash scripts/build.sh --version 3.1.3
-bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cpu-Linux-x86_64.sh 3.1.3
+# CPU  (installers land in dist/<variant>/, named deepmd-kit-<ver>-<date>-<hash>-<variant>-...sh)
+bash scripts/build.sh --version 3.2.0b0
+bash scripts/verify_offline.sh dist/cpu/*.sh 3.2.0b0
 
 # GPU (CUDA 12.9 matches upstream). Build on any node; VERIFY on a GPU node.
-bash scripts/build.sh --version 3.1.3 --cuda 12.9
-bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1.3
+bash scripts/build.sh --version 3.2.0b0 --cuda 12.9
+bash scripts/verify_offline.sh dist/cuda129/*.sh 3.2.0b0
 ```
 
 **Mode B — package a GIT COMMIT of deepmd-kit (two stages):**
@@ -48,7 +51,7 @@ bash scripts/build_pkg_from_commit.sh --commit <sha> --cuda 12.9 \
 
 # Stage 2: bundle that exact commit build into the offline installer.
 bash scripts/build.sh --from-commit-channel ./local-channel
-bash scripts/verify_offline.sh dist/*.sh
+bash scripts/verify_offline.sh dist/*/*.sh
 ```
 
 > Stage 1 (building a commit from source) must be validated on Linux against the
@@ -61,18 +64,25 @@ The verify step NO LONGER stops at `dp -h` — it runs `dp train` + `dp freeze` 
 
 ```bash
 # Default (TF + JAX); specify backend and pin versions:
-bash scripts/build.sh --version 3.1.3 --backend pytorch --torch-version ">=2.5"
-bash scripts/build.sh --version 3.1.3 --cuda 12.9 --glibc 2.28 --torch-version ">=2.5"
+bash scripts/build.sh --version 3.2.0b0 --backend pytorch --torch-version ">=2.5"
+bash scripts/build.sh --version 3.2.0b0 --cuda 12.9 --glibc 2.28 --torch-version ">=2.5"
 ```
 
 A build is only "done" when the **verify step passes**, not when a `.sh` appears.
 
-## Why two modes
+## Why three modes
 
-`constructor` can only bundle conda packages that ALREADY exist on a channel; no
-per-commit deepmd-kit conda package is published anywhere. So commit packaging
-(Mode B) must FIRST build the commit from source into a local channel (Stage 1),
-then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
+`constructor` can only bundle conda packages that ALREADY exist on a channel.
+- **Mode A (releases)** pulls the pre-built conda package by version — cpu + the
+  single cudaXXX build conda-forge publishes per release (cuda129 for 3.2.0b0).
+- **Mode B (commit)**: no per-commit deepmd-kit conda package exists anywhere, so
+  the commit must FIRST be built from source into a local channel (Stage 1), then
+  constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
+- **Mode C (cuda126 / cuda128)**: conda-forge does NOT publish these CUDA builds,
+  so constructor cannot make them at all. `scripts/build_modec.sh` instead pip-installs
+  torch cuXXX + deepmd + CPU-only TensorFlow + a lammps wheel, then `conda-pack`s the
+  env into a self-extracting .sh. (cuda131 = the cuda128 build relabeled for CUDA 13.1
+  machines; deepmd 3.2.0b0 has no native CUDA-13 build.)
 
 ## Agent responsibilities (orchestration only)
 
@@ -85,7 +95,7 @@ then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
    version pins (`--torch-version`, `TF_VERSION`/`LAMMPS_VERSION` envs).
 5. Run the bundled scripts with those parameters. Never run raw `constructor`
    or `conda build` commands — the scripts freeze the error-prone steps.
-6. Run `scripts/verify_offline.sh`. The bar is: installs offline → `dp train`
+6. Run `scripts/verify_offline.sh` (Mode C installers use `scripts/verify_offline_modec.sh`). The bar is: installs offline → `dp train`
    on a minimal system → `dp freeze` → `lammps` inference with the frozen model.
    GPU mode auto-detected from filename; MUST run on a node with GPU+driver.
 
@@ -93,22 +103,23 @@ then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
 
 | Flag / env                | Meaning                                       | Default     |
 | ------------------------- | --------------------------------------------- | ----------- |
-| `--version`               | deepmd-kit version (Mode A)                    | 3.1.3       |
+| `--version`               | deepmd-kit version (Mode A)                    | `assets/version.txt` (now 3.2.0b0) |
 | `--cuda`                  | CUDA version; omit = CPU                       | "" (CPU)    |
-| `--glibc`                 | target system GLIBC version                    | 2.28 (CPU)  |
+| `--glibc`                 | target system GLIBC version                    | 2.28 (GPU builds) |
 | `--backend`               | ML backends: all / tensorflow / pytorch / jax  | all         |
 | `--torch-version`         | pin PyTorch version (enables pytorch in bundle) | —           |
+| `--example <name>`        | bundle a deepmd example (dpa4, se_e2_a) for offline verify | — |
 | `--from-commit-channel`   | local channel from Stage 1 (Mode B)            | —           |
 | `--split <N>`             | split GPU `.sh` into N parts (GitHub 2GiB cap) | off         |
 | `--recipe-dir`            | recipe dir with construct.yaml                 | bundled `assets/` |
-| `--output-dir`            | where the installer is written                 | `./dist`    |
+| `--output-dir`            | where the installer is written                 | `./dist/<variant>/` |
 | `--commit` (Stage 1)      | deepmd-kit git commit to build                 | —           |
 | `TF_VERSION`/`LAMMPS_VERSION` env | pin TensorFlow / LAMMPS                 | `>=2.19` / unpinned |
 
 ## Agent checklist
 
 - [ ] conda available
-- [ ] Mode A: `build.sh --version` (+ `--cuda` if GPU) — OR — Mode B: `build_pkg_from_commit.sh --commit` then `build.sh --from-commit-channel`
+- [ ] Mode A: `build.sh --version` (+ `--cuda` if GPU) — OR — Mode B: `build_pkg_from_commit.sh --commit` then `build.sh --from-commit-channel` — OR — Mode C: `build_modec.sh cu126|cu128` (CUDA builds conda-forge doesn't publish)
 - [ ] `.sh` installer produced; manifest reports absolute path + sha256
 - [ ] `verify_offline.sh` PASSED — the real bar: **dp train → dp freeze → lammps inference** in clean offline env; GPU mode also checks `nvidia-smi` + backend GPU + XLA/libdevice proof
 - [ ] reported version / commit / backend versions match what was requested
@@ -124,4 +135,4 @@ then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
   the resulting `.sh` is multi-GB (use `--split` for GitHub's 2GiB asset cap).
 - For stable releases, do not build off the `deepmd-kit_rc` channel label — see
   the warning at the top of `assets/construct.yaml`.
-- CI template to build on every merge: `assets/build-on-merge.yml`.
+- The live CI is `.github/workflows/nightly.yml` (daily; builds ALL variants — cpu/cuda129 via Mode A, cuda126/cuda128 via Mode C — runs a no-GPU smoke test, uploads to the per-version Release, and commits `assets/manifest.json` directly). There is no separate GPU verify lane: per the mentor, deepmd's own PR tests cover the code, so we verify the packaging once and trust it thereafter.

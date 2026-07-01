@@ -42,9 +42,9 @@ if fresh == 0:
 if not variants:
     raise SystemExit("merge_manifest: no variants to write")
 
-# Top-level version reflects the freshly-verified builds, NOT version.txt: the verify
-# lane only writes a fragment for a variant that PASSED GPU verification, so this never
-# advances manifest.version to a version that wasn't actually verified + published.
+# Top-level version reflects the freshly-built variants, NOT version.txt: the nightly
+# build job only writes a fragment for a variant that built + passed the no-GPU smoke
+# test, so this never advances manifest.version to a version that wasn't actually published.
 if fresh_versions:
     def _vkey(s):
         try:

@@ -33,7 +33,7 @@ source <安装路径>/bin/activate <安装路径>
 dp --version
 ```
 
-> GPU 用户只装这一个包就行：它覆盖**整个 CUDA 12.x ~ 13.0 驱动**，不用对版本
+> GPU 用户只装这一个包就行：它覆盖**整个 CUDA 12.x ~ 13.x 驱动**，不用对版本
 > （靠 [NVIDIA 向后兼容](https://docs.nvidia.com/deploy/cuda-compatibility/)）。
 
 ### 3 · 命令一览
@@ -48,7 +48,7 @@ dp --version
 #### 离线安装与分片包
 
 GPU 离线包很大（约 6 GB），超过 GitHub 单文件 2 GB 上限，所以被切成 3 片：
-`...sh.0`、`...sh.1`、`...sh.2`。**你不用手动合并——`--file` 指向去掉 `.0` 的"基础文件名"，dpack 会自动把同目录下的分片拼好再安装。**
+`...sh.0`、`...sh.1`、`...sh.2`。**你不用手动合并——`--file` 指向去掉 `.0` 的“基础文件名”，dpack 会自动把同目录下的分片拼好再安装。**
 
 ```bash
 # 情况一：单个完整 .sh（CPU 包，没切片）—— 直接指它
@@ -95,13 +95,17 @@ dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-8f40cf6-cuda129-Linux-x86_
 | 联网 | 在线安装需要；离线 `--file` 模式不需要 |
 | 权限 | 无需 root（装到用户目录） |
 | GLIBC | ≥ 2.17 |
-| GPU 版 | 需兼容的 NVIDIA 驱动（CUDA 12.x ~ 13.0） |
+| GPU 版 | 需兼容的 NVIDIA 驱动（CUDA 12.x ~ 13.x） |
 
 ### 它怎么工作（选读）
 
 ```
-每天自动构建离线包  →  发布到 GitHub Release  →  dpack 按你的机器自动选版本、下载、安装
-   nightly CI            （附 manifest 清单）         （或你手动下载 → --file 安装）
+deepmd 出新版
+  → nightly CI 自动构建各变体离线包
+      → 安装包(.sh)上传到 GitHub Release
+      → manifest.json 提交到仓库(记录每个包的下载地址 + sha256)
+  → dpack 读 manifest,按你的机器选变体 → 下载 → 校验 sha256 → 安装
+    (或你手动下载安装包 → --file 离线安装)
 ```
 
 科学计算集群通常**断网**，`conda install` / `pip install` 用不了。dpack 把 deepmd-kit +
@@ -110,73 +114,8 @@ LAMMPS + TF/JAX/PyTorch + MPI + 全部依赖打包成单个自包含文件——
 
 ---
 
-## 给维护者：构建与发布离线包
-
-> 以下是**内部维护**内容——普通用户不需要看。这个 repo 除了 dpack，还附带一套离线包
-> 构建脚本、自动发布的 nightly workflow，和一个 Claude Code skill。
-
-### 仓库结构
-
-```
-deepmd-dpack/
-├─ dpack                  包管理器（用户入口）
-├─ install.sh             dpack 引导安装脚本（curl | bash）
-│
-├─ .github/workflows/
-│  └─ nightly.yml         每日自动构建 + 发布（对标 PyTorch nightly）
-│
-├─ scripts/               固化构建/验收脚本
-│  ├─ build.sh            构建离线安装包
-│  ├─ verify_offline.sh   断网全流程验收（dp train + lammps）
-│  ├─ gen_manifest_fragment.py / merge_manifest.py  manifest 自动生成
-│  ├─ build_pkg_from_commit.sh  Git commit → conda 包（高级）
-│  └─ freeze.sh           锁定版本 → 可复现构建
-│
-├─ assets/                constructor 配方 + 工具清单
-│  ├─ construct.yaml      Jinja2 模板（定义装什么）
-│  ├─ manifest.json       工具清单（dpack 读它拿下载链接，由 CI 自动更新）
-│  ├─ version.txt         版本号单一来源
-│  └─ pre/post_install.sh 安装前后钩子
-│
-├─ SKILL.md               附带的 Claude Code skill（Agent 编排构建）
-├─ HANDOFF.md             开发交接 + 验收清单（内部）
-├─ references/            内部文档（用户无需阅读）
-│  ├─ notes.md            构建/排查参考、GPU/commit 流程
-│  └─ verification-log.md 验证记录（Bohrium 实测结果与踩坑）
-└─ examples/ evals/       验证数据 / 质量评测
-```
-
-### 自动发布闭环
-
-release `v3.2.0b0` 现有 5 个变体：`cpu + cuda126 + cuda128 + cuda129 + cuda130`（`cuda126/128/130` 的 GPU 计算走 PyTorch）。
-
-**流程：**
-
-```
-GitHub Actions（每天）               玻尔 GPU（cron）
-  构建 cu126/128/130 → 传 Release      下当天的包 → GPU 验证（train/freeze/lammps）
-                                       → 通过才写进 manifest.json
-```
-
-GitHub 负责**构建**，玻尔负责 **GPU 验证**；`manifest.json` 只收录验证通过的变体，dpack 据此为用户选包。
-
-**怎么用：**
-- 手动触发构建：`Actions → Nightly Build (Mode C) → Run workflow`（选 `cu126` / `cu128` / `cu130` / `all`）。
-- 手动跑验证并发布（在玻尔 GPU 节点）：`export GH_PAT=<细粒度 PAT> && bash scripts/verify_and_publish.sh`。
-- 自动：GitHub 每天构建；玻尔 cron 每天验证并发布。
-
-### 手动单独构建一个包
-
-```bash
-# Mode A：cpu / cuda129（conda constructor）
-bash scripts/build.sh                 # CPU
-bash scripts/build.sh --cuda 12.9     # cuda129
-
-# Mode C：cuda126 / 128 / 130（需 Linux GPU 节点）
-bash scripts/build_modec.sh cu126     # 或 cu128 / cu130
-```
-
-- **Mode B**：conda-forge 没有的未发布 commit，先源码编译到本地 channel 再打包，需 Docker。详见 [references/notes.md](references/notes.md)。
+> 维护者信息（构建/发布内幕、三种构建模式、nightly 流水线）见
+> [references/verification-log.md](references/verification-log.md)。
 
 ### License
 
@@ -210,7 +149,7 @@ source <prefix>/bin/activate <prefix>
 dp --version
 ```
 
-> GPU users install just one package: it covers the entire **CUDA 12.x ~ 13.0 driver line** —
+> GPU users install just one package: it covers the entire **CUDA 12.x ~ 13.x driver line** —
 > no version-matching ([NVIDIA backward compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/)).
 
 ### 3 · Commands
@@ -271,15 +210,17 @@ Goal: **one `dpack` for the whole DeepModeling ecosystem** (`dpack install dpgen
 | Network | needed for online install; not for offline `--file` |
 | Privileges | none (installs to user dir) |
 | GLIBC | ≥ 2.17 |
-| GPU variant | compatible NVIDIA driver (CUDA 12.x ~ 13.0) |
+| GPU variant | compatible NVIDIA driver (CUDA 12.x ~ 13.x) |
 
 ### How It Works (optional)
 
 ```
-nightly CI builds offline packages  →  publishes to a GitHub Release  →  dpack auto-picks
-   (daily)                              (with a manifest)                 the build for your
-                                                                          machine, downloads,
-                                                                          installs
+a new deepmd release
+  → nightly CI builds each variant
+      → installers (.sh) are uploaded to a GitHub Release
+      → manifest.json is committed to the repo (each package's URL + sha256)
+  → dpack reads the manifest, auto-picks the build for your machine → download → verify sha256 → install
+    (or download an installer yourself → install with --file)
 ```
 
 HPC clusters are usually disconnected — `conda install` / `pip install` don't work. dpack packs
@@ -288,34 +229,8 @@ copy it over a USB stick and one command installs it. No network, no root, no ma
 
 ---
 
-## For Maintainers
-
-> Internal content — regular users can skip this. Besides dpack, this repo bundles the offline-package
-> build scripts, the nightly auto-publish workflow, and a Claude Code skill.
-
-```bash
-git clone https://github.com/Isaiah-WU/deepmd-dpack.git
-cd deepmd-dpack
-
-bash scripts/build.sh                 # CPU build (~10-15 min)
-bash scripts/build.sh --cuda 12.9     # GPU build (covers 12.x~13.0 drivers)
-
-# Offline acceptance: cut network → install → dp train → freeze → lammps
-bash scripts/verify_offline.sh dist/*/*.sh $(cat assets/version.txt)
-```
-
-The nightly pipeline (`nightly.yml`) runs **daily at 02:17 UTC** (and on pushes touching
-`construct.yaml` / `version.txt` / `build.sh`): it builds cpu + cuda129 → creates/updates a GitHub Release →
-uploads installers (GPU auto-split) → regenerates `assets/manifest.json` → commits it back. Trigger
-manually via `Actions → Nightly Build & Publish → Run workflow` (`variant`: cpu / cuda129 / all).
-
-Build flags: `--version`, `--cuda`, `--backend {all,tensorflow,pytorch,jax}`, `--torch-version`,
-`--glibc`, `--example {dpa4,se_e2_a}`, `--split N`, `--from-commit-channel`. **Mode A** packs released
-conda packages (default); **Mode B** builds a git commit from source into a local channel first (Docker).
-GPU ships only `cuda129` — conda-forge publishes one CUDA build per deepmd release, covering the whole
-12.x driver line via minor-version compatibility. Details:
-[references/notes.md](references/notes.md), [references/verification-log.md](references/verification-log.md),
-[HANDOFF.md](HANDOFF.md).
+> Maintainers: build/release internals, the three build modes, and the nightly pipeline are
+> documented in [references/verification-log.md](references/verification-log.md).
 
 ### License
 

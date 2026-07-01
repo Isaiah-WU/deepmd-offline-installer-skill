@@ -87,7 +87,7 @@ pick_variant() {
     # but a cuda131 build will NOT run on a 13.0 driver.
     local want_num best="" best_num=0
     want_num=$(awk "BEGIN{printf \"%d\", $cuda*10}")
-    for v in 13.1 13.0 12.9 12.8 12.6 12.4 12.1; do
+    for v in 13.1 12.9 12.8 12.6; do
       echo "$manifest" | grep -q "\"cuda${v//./}\"" || continue
       local vn; vn=$(awk "BEGIN{printf \"%d\", $v*10}")
       if [[ "$vn" -le "$want_num" && "$vn" -gt "$best_num" ]]; then

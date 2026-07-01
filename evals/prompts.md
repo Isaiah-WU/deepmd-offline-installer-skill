@@ -6,10 +6,10 @@ assertion in [assertions.md](assertions.md).
 
 ## P1 — CPU build, explicit version
 > I need a DeePMD-kit offline installer for an air-gapped server. Build the CPU
-> variant of deepmd-kit 3.1.3 and confirm it actually installs with no internet.
+> variant of deepmd-kit 3.2.0b0 and confirm it actually installs with no internet.
 
 ## P2 — CUDA build
-> Build a DeePMD-kit GPU offline installer for CUDA 12.1, version 3.1.3, and
+> Build a DeePMD-kit GPU offline installer for CUDA 12.9, version 3.2.0b0, and
 > verify it installs offline. The target machine has an NVIDIA driver already.
 
 ## P3 — defaults / minimal instruction (stress test the orchestration)

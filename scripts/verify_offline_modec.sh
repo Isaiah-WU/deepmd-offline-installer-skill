@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verify_offline_modec.sh — 在【已激活】的 Mode C 环境里做 GPU 端到端验证。
 #   要求:torch 看得见 GPU → dp --pt train(合成数据,10 步)→ dp --pt freeze → lammps MD 跑完。
-#   全过 exit 0;任一步失败 exit 非 0。供 verify_and_publish.sh(玻尔 cron)调用。
+#   全过 exit 0;任一步失败 exit 非 0。作为一次性 GPU 端到端验证在 GPU 节点手动运行。
 # 用法:先 `source <prefix>/bin/activate`,再 `bash verify_offline_modec.sh`。
 set -euo pipefail
 

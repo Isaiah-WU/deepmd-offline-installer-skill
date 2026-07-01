@@ -3,8 +3,8 @@
 
 对照 PyTorch:PyTorch nightly "每晚打最新" 是因为它掌控自己的源码 + 依赖。我们不同——
 deepmd 是第三方包,且 build_modec.sh 里 deepmd 与 tensorflow-cpu / torch / lammps 是【版本死锁
-配方】。所以这里只"检测最新 + 判断 pin 是否还兼容 + 报警",真正放行交给玻尔 GPU 验证门:
-版本即使被 bump,GPU 验证不过就进不了 manifest,用户拿不到。
+配方】。所以这里只"检测最新 + 判断 pin 是否还兼容 + 报警":检测到比【已发布】更新的版本才触发
+构建,构建后由 nightly CI 做无 GPU 冒烟测试并直接写 manifest(不设 GPU 验证门;完整 GPU 验证按需手动跑)。
 
 策略:
   PRERELEASE=1(默认)  连预发布(b/rc)一起算最新
@@ -81,7 +81,7 @@ if not cands:
 
 latest = str(max(cands))
 
-# "当前" = dpack 现在实际发布给用户的版本 = manifest 顶层 version(由验证道写)。
+# "当前" = dpack 现在实际发布给用户的版本 = manifest 顶层 version(由 nightly CI 的 manifest job 写)。
 # 跟它比,而不是 version.txt —— 只有出现比【已发布】更新的 deepmd 才构建。manifest 读不到时回退 version.txt。
 cur = ""
 try:

@@ -1,5 +1,9 @@
 # Handoff — how to verify this skill is mentor-grade
 
+> ⚠️ 历史 / 方法文档:本文件是早期(Round 1-3)的验收方法与变更记录。**当前的设计、三种构建模式、
+> nightly 流水线与命令以 [references/verification-log.md](references/verification-log.md) 为准。**
+> 下方 Round 表是历史;"acceptance flow" 的命令已更新到当前(3.2.0b0 + `dist/<variant>/`)。
+
 This skill builds a DeePMD-kit **offline installer** (`.sh`) with conda
 `constructor`, then proves it installs on an air-gapped machine. Your mentor's
 bar: **every run succeeds, on any model** (`pass_rate = 100%`, variance = 0).
@@ -27,26 +31,26 @@ bar: **every run succeeds, on any model** (`pass_rate = 100%`, variance = 0).
 | Fix | Why |
 | --- | --- |
 | `dpack` package manager + `install.sh` bootstrap | One-line install like dp1s/pixi: `dpack install dp` (online, auto-detect CUDA, download split parts → reassemble → sha256 → install) or `--file` (offline). Installs to user dir, no root. |
-| `.github/workflows/nightly.yml` | PyTorch-style daily CI building CPU + CUDA variants → Release. |
+| `.github/workflows/nightly.yml` | PyTorch-style daily CI: builds the full matrix (cpu/cuda129 Mode A + cuda126/128 Mode C + cuda131 alias), runs a no-GPU smoke test, uploads to the per-version Release, and commits `manifest.json`. |
 | Version-aware CUDA guard in `build.sh` + libdevice fix (pin `py_5` + `cuda-nvvm` + post_install symlink self-heal) | Resolved the TF-backend libdevice JIT failure; guard fails fast when a requested `cudaXXX` build doesn't exist on conda-forge. |
-| Multi-CUDA resolved | conda-forge ships one `cudaXXX` build per deepmd release; the 3.2.0b0 `cuda129` build covers the whole CUDA 12.x + 13.0 driver line via NVIDIA minor-version compatibility. 12.8/13.1 were never published upstream. Full evidence in `references/verification-log.md`. |
+| Multi-CUDA resolved | conda-forge ships one `cudaXXX` build per deepmd release (cuda129 for 3.2.0b0). The other GPU variants (cuda126/cuda128) are built via **Mode C** (pip torch + conda-pack) precisely because conda-forge does not publish them; cuda131 = cuda128 relabeled for 13.1. Shipped set: cpu/cuda126/cuda128/cuda129/cuda131. Full evidence in `references/verification-log.md`. |
 
 ## The acceptance flow (run in this order)
 
 ### 1. On a Linux build machine WITH internet
 ```bash
 cd deepmd-dpack
-bash scripts/build.sh --version 3.1.3            # CPU
-bash scripts/verify_offline.sh dist/*.sh 3.1.3   # proves offline install works
-bash scripts/freeze.sh dist/*.sh                 # capture exact pins -> dist/*.lock.txt
+bash scripts/build.sh --version 3.2.0b0              # CPU
+bash scripts/verify_offline.sh dist/cpu/*.sh 3.2.0b0   # proves offline install works
+bash scripts/freeze.sh dist/cpu/*.sh                 # capture exact pins -> dist/cpu/*.lock.txt
 ```
 Then paste the key versions from the freeze output into `assets/construct.yaml`.
 
 ### 1b. GPU variant (build anywhere; VERIFY on a GPU node)
 ```bash
-bash scripts/build.sh --version 3.1.3 --cuda 12.9          # add --split 3 to ship via GitHub
+bash scripts/build.sh --version 3.2.0b0 --cuda 12.9          # add --split 3 to ship via GitHub
 # on a Bohrium GPU node with an NVIDIA driver:
-bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1.3
+bash scripts/verify_offline.sh dist/cuda129/*.sh 3.2.0b0
 ```
 
 ### 1c. Commit-keyed build (Mode B — two stages, Linux + Docker)
@@ -55,12 +59,12 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 bash scripts/build_pkg_from_commit.sh --commit <sha> --cuda 12.9 \
      --config linux_64_cuda_compiler_version12.9mpimpichpython3.11.____cpython
 bash scripts/build.sh --from-commit-channel ./local-channel
-bash scripts/verify_offline.sh dist/*.sh
+bash scripts/verify_offline.sh dist/*/*.sh
 ```
 
 ### 2. Deterministic stability (Layer 1)
 ```bash
-RUNS=3 VERSION=3.1.3 bash evals/run_build_verify.sh
+RUNS=3 VERSION=3.2.0b0 bash evals/run_build_verify.sh
 ```
 Want: `pass_rate: 3/3 = 100%` and `build_variance: ZERO`.
 
@@ -75,7 +79,7 @@ Want: `agent pass_rate = 100%` on ≥2 models.
 - [ ] Layer 1: pass_rate 100%, build_variance ZERO
 - [ ] Layer 2: pass_rate 100% across ≥2 models, ≥5 runs each
 - [ ] versions pinned in `construct.yaml` (from `freeze.sh`); not building off `deepmd-kit_rc`
-- [ ] `dist/*.lock.txt` committed as the reproducibility record
+- [ ] `dist/<variant>/*.lock.txt` committed as the reproducibility record
 
 ## Verification status
 The full pipeline has been **run end-to-end on Bohrium** (Tesla V100, driver

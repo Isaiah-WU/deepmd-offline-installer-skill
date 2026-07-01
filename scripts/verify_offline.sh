@@ -24,7 +24,7 @@ esac
 INSTALLER="$(cd "$(dirname "$INSTALLER")" && pwd)/$(basename "$INSTALLER")"
 INSTALLER_DIR="$(dirname "$INSTALLER")"
 
-# Auto-detect bundled example: build.sh --example dpa4 places it in dist/examples/water/
+# Auto-detect bundled example: build.sh --example dpa4 places it in dist/<variant>/examples/water/
 BUNDLED_EXAMPLE=""
 for cand in "$INSTALLER_DIR/examples/water" "$INSTALLER_DIR/../examples/water"; do
   if [[ -f "$cand/data/data_0/type.raw" ]]; then BUNDLED_EXAMPLE="$cand"; break; fi

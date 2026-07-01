@@ -5,7 +5,7 @@ didn't error" hand-waving — offline-install success is the bar.
 
 ## Build-side (must all hold)
 1. `scripts/build.sh` exits 0.
-2. A `dist/*.sh` installer exists.
+2. An installer `.sh` exists under `dist/<variant>/` (GPU builds may be 3 split parts `.sh.0/.1/.2`).
 3. A manifest exists reporting an absolute path, size, and sha256.
 4. The agent called `scripts/build.sh` (orchestration), NOT raw `constructor`
    commands typed from scratch.
@@ -22,7 +22,7 @@ didn't error" hand-waving — offline-install success is the bar.
 ## Stability (across runs)
 6. pass_rate over N runs = 100%.
 7. Build variance = 0: every run's installer sha256 is identical (Layer 1), OR
-   the same package versions are bundled (check `dist/*.lock.txt` from freeze.sh).
+   the same package versions are bundled (check `dist/<variant>/*.lock.txt` from freeze.sh).
 
 ## Recording rule
 - A skipped check (e.g. CUDA verify on a CPU-only box) is recorded as SKIP, never

@@ -4,21 +4,22 @@
 # 用法:
 #   bash scripts/build_modec.sh cu126        # 产出 cuda126 包
 #   bash scripts/build_modec.sh cu128        # cuda128
-#   bash scripts/build_modec.sh cu130        # cuda130(13.0)
 #
 # 产出: /tmp/deepmd-kit-<VER>-<DATE>-<HASH>-cuda<XXX>-Linux-x86_64.sh  (+ sha256)
 #
 # 环境变量(CI 用):
 #   SKIP_GPU_CHECK=1   跳过需要 GPU 的自检(GitHub runner 无 GPU);仍保留 import/打包完整性校验。
-#                      真正的 GPU 验证(torch.cuda + train/freeze/lammps)在玻尔做(见 verify_and_publish.sh)。
+#                      nightly CI 构建后做无 GPU 冒烟测试;完整 GPU 端到端(train/freeze/lammps)
+#                      作为一次性验证手动跑 verify_offline_modec.sh(见 references/verification-log.md)。
 #   BUILD_HASH=<hash>  覆盖文件名里的短哈希(CI 用 git rev-parse --short HEAD)。
 #   BUILD_DATE=<YYYYMMDD>  覆盖日期。
 #
-# 说明:换 CUDA 只改 torch 的 cuXXX;tensorflow-cpu 是 CPU 版(仅为加载 lmp 插件,不做 GPU 计算),
-#       所以 13.0 也用同一套配方(GPU 后端 = torch cu130)。
+# 说明:换 CUDA 只改 torch 的 cuXXX;tensorflow-cpu 是 CPU 版(仅为加载 lmp 插件,不做 GPU 计算)。
+#       只构建 CUDA 12.x(cu126/cu128):deepmd 3.2.0b0 的 LAMMPS 插件对着 CUDA 12 编译,CUDA 13 的
+#       torch 同进程会崩;CUDA 12 的包靠驱动向后兼容已覆盖 13.x 机器(cuda131 = cuda128 改名)。
 set -euo pipefail
 
-CU="${1:?用法: bash build_modec.sh cu126|cu128|cu130}"
+CU="${1:?用法: bash build_modec.sh cu126|cu128}"
 NUM="${CU#cu}"                                   # cu126 -> 126
 VARIANT="cuda${NUM}"                             # -> cuda126
 VER="${DEEPMD_VER:-3.2.0b0}"
@@ -57,7 +58,7 @@ echo "==> [3/7] 装 tensorflow-cpu==$TF_VER(加载 lmp 插件必须)+ lammps whe
 
 echo "==> [4/7] 自检"
 if [ -z "${SKIP_GPU_CHECK:-}" ]; then
-  # 本地/玻尔:完整 GPU 自检
+  # 有 GPU 时(本地/GPU 节点):完整 GPU 自检
   "$ENV/bin/python" - <<'PY'
 import torch
 assert torch.cuda.is_available(), "GPU 不可见(这台没 GPU 或驱动/CUDA 不匹配)"
@@ -66,8 +67,8 @@ from deepmd.pt.utils import env as e; print("   deepmd-pt DEVICE", e.DEVICE)
 import deepmd.lmp; print("   lmp plugin dir", deepmd.lmp.get_op_dir())
 PY
 else
-  # CI(无 GPU):只验装包完整性,不碰 torch.cuda;真 GPU 验证在玻尔
-  echo "   SKIP_GPU_CHECK=1 → 只做 import/打包完整性校验(GPU 验证留给玻尔验证道)"
+  # CI(无 GPU):只验装包完整性,不碰 torch.cuda;完整 GPU 验证按需手动跑 verify_offline_modec.sh
+  echo "   SKIP_GPU_CHECK=1 → 只做 import/打包完整性校验(完整 GPU 验证手动跑 verify_offline_modec.sh)"
   "$ENV/bin/python" - <<'PY'
 import torch
 print("   torch", torch.__version__, "| cuda(built)", torch.version.cuda)

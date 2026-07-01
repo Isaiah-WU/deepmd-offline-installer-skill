@@ -10,9 +10,9 @@ agent/model in the loop. If this isn't 100%, no model can save you.
 
 ```bash
 # On a Linux build machine WITH internet (constructor needs to download):
-RUNS=3 VERSION=3.1.3 bash evals/run_build_verify.sh
-# CUDA:
-RUNS=3 VERSION=3.1.3 CUDA_VERSION=12.1 bash evals/run_build_verify.sh
+RUNS=3 VERSION=3.2.0b0 bash evals/run_build_verify.sh
+# CUDA (Mode A / build.sh only builds cuda129):
+RUNS=3 VERSION=3.2.0b0 CUDA_VERSION=12.9 bash evals/run_build_verify.sh
 ```
 Reports per-run pass/fail, overall `pass_rate`, and whether every run produced a
 **byte-identical** installer (sha256) — that's your build-variance check.

@@ -4,15 +4,15 @@
 # variance (byte-identical installers across runs?).
 #
 # Usage (on a Linux build machine WITH internet):
-#   RUNS=3 VERSION=3.1.3 bash evals/run_build_verify.sh
-#   RUNS=3 VERSION=3.1.3 CUDA_VERSION=12.1 bash evals/run_build_verify.sh
+#   RUNS=3 VERSION=3.2.0b0 bash evals/run_build_verify.sh
+#   RUNS=3 VERSION=3.2.0b0 CUDA_VERSION=12.9 bash evals/run_build_verify.sh
 #
 # NOTE: do not use `set -e` here — we must keep looping past a failed run to
 # compute an honest pass_rate.
 set -uo pipefail
 
 RUNS="${RUNS:-3}"
-VERSION="${VERSION:-3.1.3}"
+VERSION="${VERSION:-3.2.0b0}"
 CUDA_VERSION="${CUDA_VERSION:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

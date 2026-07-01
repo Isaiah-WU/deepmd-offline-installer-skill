@@ -20,7 +20,7 @@ set -uo pipefail
 RUNS="${RUNS:-5}"
 AGENT_CMD="${AGENT_CMD:?set AGENT_CMD, e.g. AGENT_CMD='claude -p'}"
 PROMPTS_FILE="${1:?usage: run_agent_benchmark.sh <prompts.md>}"
-VERSION="${VERSION:-3.1.3}"
+VERSION="${VERSION:-3.2.0b0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -35,13 +35,13 @@ for p in "${PROMPTS[@]}"; do
   for i in $(seq 1 "$RUNS"); do
     total=$((total+1))
     echo "### prompt='${p:0:50}...' run=$i ###"
-    rm -rf "$SKILL_ROOT/dist"/*.sh 2>/dev/null || true
+    rm -rf "$SKILL_ROOT/dist"/*/*.sh 2>/dev/null || true
 
     # ---- run the agent (adapt this line to your CLI) ----
     echo "$p" | $AGENT_CMD
 
     # ---- objective acceptance: did it produce a verifiable offline installer? ----
-    installer="$(ls "$SKILL_ROOT/dist"/*.sh 2>/dev/null | head -1)"
+    installer="$(ls "$SKILL_ROOT/dist"/*/*.sh 2>/dev/null | head -1)"
     if [[ -n "$installer" ]] && bash "$SKILL_ROOT/scripts/verify_offline.sh" "$installer" "$VERSION"; then
       pass=$((pass+1)); echo "  -> PASS" | tee -a "$RESULTS"
     else

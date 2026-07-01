@@ -58,7 +58,7 @@ file_version = _m.group("ver") if _m else version
 build_date = _m.group("date") if _m else ""
 
 # backend/note are env-driven so Mode A (cpu/cuda129) keeps tf+jax+torch while
-# Mode C (cuda126/128/130, set by the verify lane) reports pytorch + its own note.
+# Mode C (cuda126/128, set by the nightly build job) reports pytorch + its own note.
 entry = {
     "type": "gpu" if cuda else "cpu",
     "cuda": cuda or None,
@@ -66,7 +66,7 @@ entry = {
 }
 _note = os.environ.get("NOTE", "").strip()
 if cuda:
-    entry["note"] = _note or "Covers the CUDA 12.x ~ 13.0 driver line via NVIDIA minor-version compatibility."
+    entry["note"] = _note or "Covers the CUDA 12.x ~ 13.x driver line via NVIDIA minor-version compatibility."
 
 if parts:
     entry["parts"] = [f"{base}/{os.path.basename(p)}" for p in parts]
