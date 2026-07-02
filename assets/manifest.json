@@ -13,13 +13,15 @@
           "type": "gpu",
           "cuda": "12.9",
           "backend": "tf+jax+torch",
-          "note": "Covers the CUDA 12.x ~ 13.0 driver line via NVIDIA minor-version compatibility.",
+          "note": "Covers the CUDA 12.x ~ 13.x driver line via NVIDIA minor-version compatibility.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda129-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda129-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda129-Linux-x86_64.sh.2"
           ],
-          "sha256": "3e2d31f202b9303cfcbd71b2f904ec7c9567bf2563c34b3278a9be6ba16cb886"
+          "sha256": "417ae69bb9175f97b5c2eb72f6e874c67adfa1905610aaaea7b166147276500f",
+          "version": "3.2.0b0",
+          "build_date": "20260702"
         },
         "cuda128": {
           "type": "gpu",
@@ -27,11 +29,13 @@
           "backend": "pytorch",
           "note": "Mode C (conda-pack self-extracting). PyTorch GPU backend; CPU-only TensorFlow bundled to load the LAMMPS plugin.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda128-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda128-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda128-Linux-x86_64.sh.2"
           ],
-          "sha256": "8b25e263f036e4f4b1670bb592bfad931debf47801583f9d6559e646f2262db8"
+          "sha256": "43fae51bf21365874975727a60ba1b3575af7cb48df809f69de52e2e66858845",
+          "version": "3.2.0b0",
+          "build_date": "20260702"
         },
         "cuda131": {
           "type": "gpu",
@@ -39,11 +43,13 @@
           "backend": "pytorch",
           "note": "Mode C (conda-pack self-extracting). PyTorch GPU backend; CPU-only TensorFlow bundled to load the LAMMPS plugin.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda131-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda131-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda131-Linux-x86_64.sh.2"
           ],
-          "sha256": "5c1526db10b796d607a698dfb04da0ce98889cd53cea49506a85555c4a2830d3"
+          "sha256": "43fae51bf21365874975727a60ba1b3575af7cb48df809f69de52e2e66858845",
+          "version": "3.2.0b0",
+          "build_date": "20260702"
         },
         "cuda126": {
           "type": "gpu",
@@ -51,18 +57,22 @@
           "backend": "pytorch",
           "note": "Mode C (conda-pack self-extracting). PyTorch GPU backend; CPU-only TensorFlow bundled to load the LAMMPS plugin.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda126-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda126-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda126-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda126-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda126-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cuda126-Linux-x86_64.sh.2"
           ],
-          "sha256": "4ec7e7dd5a9d519cbc84672860ee86410df52dade28252ff814db56e4ca70379"
+          "sha256": "1c8c959db7bf0d3f8927699b6935bdbff41ee3825e99d1378de6ead24474ae32",
+          "version": "3.2.0b0",
+          "build_date": "20260702"
         },
         "cpu": {
           "type": "cpu",
           "cuda": null,
           "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cpu-Linux-x86_64.sh",
-          "sha256": "fbbd3b02ae601360bd8ff389fd2b75fc5a437833b1f34aae83d05a87f5d9f7d9"
+          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260702-40cbd7d-cpu-Linux-x86_64.sh",
+          "sha256": "f1ab5d0f29a0f0f2b459f41ebef51070a6c1aebff4ac78e49fe672b2c5bebafa",
+          "version": "3.2.0b0",
+          "build_date": "20260702"
         }
       }
     }
